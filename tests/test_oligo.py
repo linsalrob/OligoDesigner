@@ -278,6 +278,18 @@ class TestWriteOutputs:
         lines = open(path).readlines()
         assert "\t" in lines[1]
 
+    def test_write_tsv_mixed_schema_raises(self, tmp_path) -> None:
+        """Mixing OligoAnalysis with StructuredOligo in one write_tsv call must fail."""
+        from OligoDesign.structured import generate_palindromic_motif
+        import random as _random
+        path = str(tmp_path / "out.tsv")
+        mixed = [
+            analyse_oligo(DNA("ACGT"), name="o1"),
+            generate_palindromic_motif(rng=_random.Random(1)),
+        ]
+        with pytest.raises(TypeError, match="Mixed TSV schemas"):
+            write_tsv(mixed, path)
+
 
 # ---------------------------------------------------------------------------
 # CLI

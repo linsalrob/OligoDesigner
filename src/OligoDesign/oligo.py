@@ -18,10 +18,10 @@ from .dna import DNA
 class WritableOligo(Protocol):
     """Protocol for oligo objects that can be written to FASTA, JSON, and TSV.
 
-    Any class that exposes ``name``, ``sequence``, ``to_dict()``, and
-    ``to_tsv_row()`` — plus a ``tsv_headers()`` static/class method —
-    satisfies this protocol and can be passed to :func:`write_fasta`,
-    :func:`write_json`, and :func:`write_tsv`.
+    Any class that exposes ``name``, ``sequence``, ``to_dict()``,
+    ``to_tsv_row()``, and the static ``tsv_headers()`` method satisfies this
+    protocol and can be passed to :func:`write_fasta`, :func:`write_json`,
+    and :func:`write_tsv`.
     """
 
     name: str
@@ -30,6 +30,9 @@ class WritableOligo(Protocol):
     def to_dict(self) -> dict: ...
 
     def to_tsv_row(self) -> list[str]: ...
+
+    @staticmethod
+    def tsv_headers() -> list[str]: ...
 
 # ---------------------------------------------------------------------------
 # Random oligo generation
@@ -377,12 +380,34 @@ def write_tsv(analyses: list[WritableOligo], path: str) -> None:
     ----------
     analyses:
         List of oligo objects with ``to_tsv_row()`` and a class-level
-        ``tsv_headers()`` method.
+        ``tsv_headers()`` method.  All objects must share the same TSV schema
+        (i.e. return the same headers); mixing types with different schemas
+        raises :exc:`TypeError`.
     path:
         Output file path.
+
+    Raises
+    ------
+    TypeError
+        If *analyses* contains objects with different TSV schemas (e.g. a
+        mix of :class:`OligoAnalysis` and
+        :class:`~OligoDesign.structured.StructuredOligo`).
     """
+    if not analyses:
+        open(path, "w").close()
+        return
+
+    headers = type(analyses[0]).tsv_headers()
+    for i, item in enumerate(analyses[1:], start=1):
+        item_headers = type(item).tsv_headers()
+        if item_headers != headers:
+            raise TypeError(
+                f"Mixed TSV schemas detected: item 0 uses {type(analyses[0]).__name__!r} "
+                f"schema but item {i} uses {type(item).__name__!r} schema. "
+                "All items passed to write_tsv must share the same TSV schema."
+            )
+
     with open(path, "w") as fh:
-        if analyses:
-            fh.write("\t".join(type(analyses[0]).tsv_headers()) + "\n")
+        fh.write("\t".join(headers) + "\n")
         for a in analyses:
             fh.write("\t".join(a.to_tsv_row()) + "\n")
