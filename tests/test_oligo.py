@@ -194,6 +194,14 @@ class TestAnalyseOligo:
         result = analyse_oligo(DNA("AAAA"), name="t")
         assert result.entropy == 0.0
 
+    def test_tm_present(self) -> None:
+        result = analyse_oligo(DNA("ATCGATCGATCGATCGATCG"), name="t")
+        assert isinstance(result.tm, float)
+
+    def test_tm_realistic_range_for_20mer(self) -> None:
+        result = analyse_oligo(DNA("ATCGATCGATCGATCGATCG"), name="t")
+        assert 30.0 < result.tm < 75.0
+
 
 # ---------------------------------------------------------------------------
 # OligoAnalysis serialisation
@@ -209,13 +217,17 @@ class TestOligoAnalysisSerialization:
 
     def test_to_dict_has_expected_keys(self) -> None:
         d = self._make().to_dict()
-        for key in ("name", "sequence", "length", "gc_content", "entropy", "is_palindrome"):
+        for key in ("name", "sequence", "length", "gc_content", "entropy", "tm", "is_palindrome"):
             assert key in d
 
     def test_to_dict_entropy_value(self) -> None:
         d = self._make().to_dict()
         assert isinstance(d["entropy"], float)
         assert 0.0 <= d["entropy"] <= 2.0
+
+    def test_to_dict_tm_is_float(self) -> None:
+        d = self._make().to_dict()
+        assert isinstance(d["tm"], float)
 
     def test_to_tsv_row_is_list_of_strings(self) -> None:
         row = self._make().to_tsv_row()

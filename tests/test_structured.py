@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 
@@ -224,13 +225,29 @@ class TestStructuredOligoSerialization:
 
     def test_to_dict_has_required_keys(self) -> None:
         d = generate_palindromic_motif(rng=random.Random(1)).to_dict()
-        for key in ("name", "sequence", "length", "oligo_type", "is_palindrome", "gc_content", "entropy"):
+        for key in ("name", "sequence", "length", "oligo_type", "is_palindrome", "gc_content", "entropy", "tm"):
             assert key in d
 
     def test_to_dict_entropy_value(self) -> None:
         d = generate_palindromic_motif(rng=random.Random(1)).to_dict()
         assert isinstance(d["entropy"], float)
         assert 0.0 <= d["entropy"] <= 2.0
+
+    def test_to_dict_tm_is_float(self) -> None:
+        d = generate_palindromic_motif(half_length=10, rng=random.Random(1)).to_dict()
+        assert isinstance(d["tm"], float)
+        assert not math.isnan(d["tm"])
+
+    def test_tm_realistic_range_for_20bp(self) -> None:
+        oligo = generate_palindromic_motif(half_length=10, rng=random.Random(1))
+        assert 10.0 < oligo.tm < 85.0
+
+    def test_at_rich_tm_lower_than_gc_rich(self) -> None:
+        at_oligo = generate_at_rich_palindrome(half_length=10, rng=random.Random(1))
+        gc_oligo = generate_palindromic_motif(half_length=10, rng=random.Random(42))
+        # AT-rich palindromes should generally have lower Tm
+        # (at_rich_palindrome arms are AT-only)
+        assert at_oligo.tm < gc_oligo.tm
 
     def test_to_tsv_row_is_list_of_strings(self) -> None:
         row = generate_palindromic_motif(rng=random.Random(1)).to_tsv_row()

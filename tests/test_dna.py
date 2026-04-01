@@ -464,3 +464,73 @@ class TestHairpin:
         # Only 3-base stem present; should not trigger min_stem=4
         dna = DNA("ACGTTTACG")  # no 4-base inverted repeat
         assert dna.has_hairpin(min_stem=4, min_loop=3, max_loop=8) is False
+
+
+# ---------------------------------------------------------------------------
+# Melting temperature (nearest-neighbor model)
+# ---------------------------------------------------------------------------
+
+
+class TestMeltingTemperature:
+    def test_empty_sequence_returns_nan(self) -> None:
+        import math
+        assert math.isnan(DNA("").melting_temperature())
+
+    def test_single_base_returns_nan(self) -> None:
+        import math
+        assert math.isnan(DNA("A").melting_temperature())
+
+    def test_returns_float(self) -> None:
+        assert isinstance(DNA("ACGTACGTACGT").melting_temperature(), float)
+
+    def test_higher_gc_gives_higher_tm(self) -> None:
+        # GC-rich sequence should melt at higher temperature than AT-rich
+        gc_rich = DNA("GCGCGCGCGCGCGCGCGCGC")
+        at_rich = DNA("ATATATATATATATATATATATA")
+        assert gc_rich.melting_temperature() > at_rich.melting_temperature()
+
+    def test_longer_sequence_higher_tm(self) -> None:
+        # Longer sequences (same composition) have higher Tm
+        short = DNA("ATCGATCG")
+        long_ = DNA("ATCGATCGATCGATCGATCG")
+        assert long_.melting_temperature() > short.melting_temperature()
+
+    def test_realistic_20mer_tm_range(self) -> None:
+        # A typical 20-mer primer at ~50% GC should be in a plausible range
+        dna = DNA("ATCGATCGATCGATCGATCG")
+        tm = dna.melting_temperature()
+        assert 30.0 < tm < 75.0
+
+    def test_self_complementary_uses_ct_not_ct_over_4(self) -> None:
+        # ACGT is self-complementary; result should differ from a
+        # non-self-complementary sequence of the same length
+        sc = DNA("ACGT")
+        non_sc = DNA("AACT")
+        assert sc.melting_temperature() != non_sc.melting_temperature()
+
+    def test_higher_salt_raises_tm(self) -> None:
+        dna = DNA("ATCGATCGATCGATCGATCG")
+        tm_low_salt = dna.melting_temperature(na_conc=0.05)
+        tm_high_salt = dna.melting_temperature(na_conc=1.0)
+        assert tm_high_salt > tm_low_salt
+
+    def test_default_na_conc_is_50mm(self) -> None:
+        dna = DNA("GCATGCATGCATGCATGCAT")
+        assert dna.melting_temperature() == dna.melting_temperature(na_conc=0.05)
+
+    def test_default_oligo_conc_is_250nm(self) -> None:
+        dna = DNA("GCATGCATGCATGCATGCAT")
+        assert dna.melting_temperature() == dna.melting_temperature(oligo_conc=250e-9)
+
+    def test_known_value_20mer(self) -> None:
+        # Verify a pre-computed value for ATCGATCGATCGATCGATCG
+        # (non-self-complementary, 20 bp) at default conditions
+        dna = DNA("ATCGATCGATCGATCGATCG")
+        tm = dna.melting_temperature()
+        assert abs(tm - 46.92) < 0.1
+
+    def test_known_value_gc_rich_20mer(self) -> None:
+        # Pre-computed value for self-complementary GCATGCATGCATGCATGCAT
+        dna = DNA("GCATGCATGCATGCATGCAT")
+        tm = dna.melting_temperature()
+        assert abs(tm - 51.15) < 0.1

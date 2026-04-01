@@ -14,6 +14,41 @@ IUPAC_BASES: frozenset[str] = frozenset("ACGTRYMKSWHBVDN")
 # Translation table for complementing uppercase DNA (ACGT only)
 _COMPLEMENT_TABLE: dict[int, int] = str.maketrans("ACGT", "TGCA")
 
+# ---------------------------------------------------------------------------
+# Nearest-neighbor thermodynamic parameters for melting temperature (Tm)
+# Source: SantaLucia (1998) PNAS 95(4):1460-1465, Table 2
+# Keys are 5'→3' dinucleotides on the top strand.
+# Values are (ΔH kcal/mol, ΔS cal/mol·K).
+# Complementary pairs share identical values and are listed separately for
+# direct lookup (e.g. "AA" and "TT" both map to the AA/TT entry).
+# ---------------------------------------------------------------------------
+_NN_PARAMS: dict[str, tuple[float, float]] = {
+    "AA": (-7.9, -22.2),
+    "TT": (-7.9, -22.2),
+    "AT": (-7.2, -20.4),
+    "TA": (-7.2, -21.3),
+    "CA": (-8.5, -22.7),
+    "TG": (-8.5, -22.7),
+    "GT": (-8.4, -22.4),
+    "AC": (-8.4, -22.4),
+    "CT": (-7.8, -21.0),
+    "AG": (-7.8, -21.0),
+    "GA": (-8.2, -22.2),
+    "TC": (-8.2, -22.2),
+    "CG": (-10.6, -27.2),
+    "GC": (-9.8, -24.4),
+    "GG": (-8.0, -19.9),
+    "CC": (-8.0, -19.9),
+}
+
+# Initiation parameters (ΔH kcal/mol, ΔS cal/mol·K) applied once per terminal
+# base pair.  Both 5' and 3' ends contribute an initiation term.
+_INIT_GC: tuple[float, float] = (0.1, -2.8)   # terminal G·C base pair
+_INIT_AT: tuple[float, float] = (2.3, 4.1)    # terminal A·T base pair
+
+# Gas constant in cal/(mol·K)
+_R: float = 1.987
+
 # IUPAC complement translation (covers standard bases and all ambiguity codes)
 _IUPAC_COMPLEMENT_TABLE: dict[int, int] = str.maketrans(
     "ACGTRYMKSWHBVDN",
@@ -516,3 +551,105 @@ class DNA:
                     if stem3 == rc_stem5:
                         return True
         return False
+
+    # ------------------------------------------------------------------
+    # Melting temperature
+    # ------------------------------------------------------------------
+
+    def melting_temperature(
+        self,
+        na_conc: float = 0.05,
+        oligo_conc: float = 250e-9,
+    ) -> float:
+        """Return the estimated melting temperature (*Tm*) in °C.
+
+        Uses the nearest-neighbor (NN) thermodynamic model with the unified
+        DNA/DNA parameters from SantaLucia (1998) and a monovalent-salt
+        correction.
+
+        Parameters
+        ----------
+        na_conc:
+            Sodium ion concentration in molar.  Default is ``0.05`` M
+            (50 mM), a typical PCR-buffer salt concentration.
+        oligo_conc:
+            Total oligonucleotide strand concentration in molar.
+            Default is ``250e-9`` M (250 nM).
+
+        Returns
+        -------
+        float
+            Estimated *Tm* in °C.  Returns ``float('nan')`` for sequences
+            shorter than 2 bases or sequences composed entirely of
+            non-ACGT characters.
+
+        Notes
+        -----
+        The *Tm* is calculated as::
+
+            Tm = ΔH / (ΔS + R · ln(CT / 4)) − 273.15
+
+        where *ΔH* (cal/mol) and *ΔS* (cal/mol·K) are the sums of the
+        nearest-neighbor stacking terms plus initiation terms for both
+        terminal base pairs, *R* = 1.987 cal/(mol·K), and *CT* is the
+        total strand concentration in molar.  For self-complementary
+        sequences ``CT / 4`` is replaced by ``CT``.
+
+        A monovalent-salt correction is then applied::
+
+            Tm_corrected = Tm_1M + 16.6 · log10([Na⁺])
+
+        Bases other than A, C, G, T (e.g. IUPAC ambiguity codes) are
+        skipped when summing nearest-neighbor parameters.
+
+        References
+        ----------
+        SantaLucia, J. (1998). A unified view of polymer, dumbbell, and
+        oligonucleotide DNA nearest-neighbor thermodynamics.
+        *PNAS*, 95(4), 1460–1465.
+
+        Examples
+        --------
+        >>> dna = DNA("GCATGCATGCATGCATGCAT")
+        >>> 30.0 < dna.melting_temperature() < 50.0
+        True
+        """
+        seq = self._sequence
+        # Keep only unambiguous bases for the NN calculation
+        acgt = "".join(b for b in seq if b in VALID_BASES)
+        n = len(acgt)
+        if n < 2:
+            return float("nan")
+
+        dh: float = 0.0  # kcal/mol
+        ds: float = 0.0  # cal/mol·K
+
+        # Sum nearest-neighbor stacking parameters
+        for i in range(n - 1):
+            pair = acgt[i : i + 2]
+            if pair in _NN_PARAMS:
+                nn_dh, nn_ds = _NN_PARAMS[pair]
+                dh += nn_dh
+                ds += nn_ds
+
+        # Add initiation terms for both terminal base pairs
+        for terminal in (acgt[0], acgt[-1]):
+            if terminal in "GC":
+                dh += _INIT_GC[0]
+                ds += _INIT_GC[1]
+            else:
+                dh += _INIT_AT[0]
+                ds += _INIT_AT[1]
+
+        # Convert ΔH from kcal/mol to cal/mol
+        dh_cal = dh * 1000.0
+
+        # Choose strand-concentration factor based on self-complementarity
+        is_sc = acgt == acgt[::-1].translate(_COMPLEMENT_TABLE)
+        ct_factor = oligo_conc if is_sc else oligo_conc / 4.0
+
+        # Tm at 1 M Na⁺ (Kelvin), then convert to Celsius
+        tm_1m = dh_cal / (ds + _R * math.log(ct_factor)) - 273.15
+
+        # Monovalent-salt correction
+        return tm_1m + 16.6 * math.log10(na_conc)

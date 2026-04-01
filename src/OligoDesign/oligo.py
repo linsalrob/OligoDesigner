@@ -196,6 +196,9 @@ class OligoAnalysis:
         Fraction of G+C bases (0.0 – 1.0).
     entropy:
         Shannon entropy of the sequence in bits (0.0 – 2.0).
+    tm:
+        Estimated melting temperature in °C (nearest-neighbor model,
+        50 mM Na⁺, 250 nM oligo concentration).
     base_composition:
         Per-base counts ``{"A": n, "C": n, "G": n, "T": n}``.
     longest_homopolymer:
@@ -219,6 +222,7 @@ class OligoAnalysis:
     length: int
     gc_content: float
     entropy: float
+    tm: float
     base_composition: dict[str, int]
     longest_homopolymer: int
     has_homopolymer: bool
@@ -241,6 +245,7 @@ class OligoAnalysis:
             str(self.length),
             f"{self.gc_content:.4f}",
             f"{self.entropy:.4f}",
+            f"{self.tm:.2f}",
             str(bc.get("A", 0)),
             str(bc.get("C", 0)),
             str(bc.get("G", 0)),
@@ -263,6 +268,7 @@ class OligoAnalysis:
             "length",
             "gc_content",
             "entropy",
+            "tm",
             "count_A",
             "count_C",
             "count_G",
@@ -314,6 +320,7 @@ def analyse_oligo(
         length=len(dna),
         gc_content=dna.gc_content(),
         entropy=dna.entropy(),
+        tm=dna.melting_temperature(),
         base_composition=dna.base_composition(),
         longest_homopolymer=dna.longest_homopolymer(),
         has_homopolymer=dna.has_homopolymer(min_length=min_hp_run),
