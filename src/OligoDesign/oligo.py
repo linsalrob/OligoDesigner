@@ -5,9 +5,34 @@ from __future__ import annotations
 import json
 import random
 from dataclasses import asdict, dataclass, field
-from typing import Optional
+from typing import Optional, Protocol
 
 from .dna import DNA
+
+
+# ---------------------------------------------------------------------------
+# Shared output protocol
+# ---------------------------------------------------------------------------
+
+
+class WritableOligo(Protocol):
+    """Protocol for oligo objects that can be written to FASTA, JSON, and TSV.
+
+    Any class that exposes ``name``, ``sequence``, ``to_dict()``,
+    ``to_tsv_row()``, and the static ``tsv_headers()`` method satisfies this
+    protocol and can be passed to :func:`write_fasta`, :func:`write_json`,
+    and :func:`write_tsv`.
+    """
+
+    name: str
+    sequence: str
+
+    def to_dict(self) -> dict: ...
+
+    def to_tsv_row(self) -> list[str]: ...
+
+    @staticmethod
+    def tsv_headers() -> list[str]: ...
 
 # ---------------------------------------------------------------------------
 # Random oligo generation
@@ -307,13 +332,17 @@ def analyse_oligo(
 # ---------------------------------------------------------------------------
 
 
-def write_fasta(analyses: list[OligoAnalysis], path: str) -> None:
+def write_fasta(analyses: list[WritableOligo], path: str) -> None:
     """Write oligo sequences to *path* in FASTA format.
+
+    Accepts any list of objects that satisfy :class:`WritableOligo`
+    (e.g. :class:`OligoAnalysis` or
+    :class:`~OligoDesign.structured.StructuredOligo`).
 
     Parameters
     ----------
     analyses:
-        List of :class:`OligoAnalysis` objects.
+        List of oligo objects with ``name`` and ``sequence`` attributes.
     path:
         Output file path.
     """
@@ -322,13 +351,15 @@ def write_fasta(analyses: list[OligoAnalysis], path: str) -> None:
             fh.write(f">{a.name}\n{a.sequence}\n")
 
 
-def write_json(analyses: list[OligoAnalysis], path: str) -> None:
+def write_json(analyses: list[WritableOligo], path: str) -> None:
     """Write the full analysis data structure to *path* as JSON.
+
+    Accepts any list of objects that satisfy :class:`WritableOligo`.
 
     Parameters
     ----------
     analyses:
-        List of :class:`OligoAnalysis` objects.
+        List of oligo objects with a ``to_dict()`` method.
     path:
         Output file path.
     """
@@ -338,17 +369,45 @@ def write_json(analyses: list[OligoAnalysis], path: str) -> None:
         fh.write("\n")
 
 
-def write_tsv(analyses: list[OligoAnalysis], path: str) -> None:
+def write_tsv(analyses: list[WritableOligo], path: str) -> None:
     """Write per-oligo analysis to *path* as a tab-separated file.
+
+    Accepts any list of objects that satisfy :class:`WritableOligo`.
+    Column headers are retrieved from ``type(analyses[0]).tsv_headers()``,
+    so the correct header row is used automatically for each oligo type.
 
     Parameters
     ----------
     analyses:
-        List of :class:`OligoAnalysis` objects.
+        List of oligo objects with ``to_tsv_row()`` and a class-level
+        ``tsv_headers()`` method.  All objects must share the same TSV schema
+        (i.e. return the same headers); mixing types with different schemas
+        raises :exc:`TypeError`.
     path:
         Output file path.
+
+    Raises
+    ------
+    TypeError
+        If *analyses* contains objects with different TSV schemas (e.g. a
+        mix of :class:`OligoAnalysis` and
+        :class:`~OligoDesign.structured.StructuredOligo`).
     """
+    if not analyses:
+        open(path, "w").close()
+        return
+
+    headers = type(analyses[0]).tsv_headers()
+    for i, item in enumerate(analyses[1:], start=1):
+        item_headers = type(item).tsv_headers()
+        if item_headers != headers:
+            raise TypeError(
+                f"Mixed TSV schemas detected: item 0 uses {type(analyses[0]).__name__!r} "
+                f"schema but item {i} uses {type(item).__name__!r} schema. "
+                "All items passed to write_tsv must share the same TSV schema."
+            )
+
     with open(path, "w") as fh:
-        fh.write("\t".join(OligoAnalysis.tsv_headers()) + "\n")
+        fh.write("\t".join(headers) + "\n")
         for a in analyses:
             fh.write("\t".join(a.to_tsv_row()) + "\n")
