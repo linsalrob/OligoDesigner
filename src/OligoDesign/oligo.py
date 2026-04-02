@@ -131,16 +131,20 @@ def has_tandem_repeat(
 
 def _complementarity_score(seq_a: str, seq_b: str, min_overlap: int) -> bool:
     """Return True if *seq_a* and *seq_b* share >= *min_overlap* complementary bases."""
-    # Build the reverse complement of seq_b and look for overlap >= min_overlap
+    if len(seq_a) < min_overlap or len(seq_b) < min_overlap:
+        return False
+    # Build the reverse complement of seq_b.  Any substring of seq_a that
+    # appears as a substring of rc_b represents a complementary region.
     rc_b = seq_b[::-1].translate(str.maketrans("ACGT", "TGCA"))
-    # Check all overlapping windows of length >= min_overlap
-    for length in range(min(len(seq_a), len(rc_b)), min_overlap - 1, -1):
-        # sliding window in seq_a
-        for i in range(len(seq_a) - length + 1):
-            if seq_a[i : i + length] == rc_b[:length]:
-                return True
-            if seq_a[i : i + length] == rc_b[len(rc_b) - length :]:
-                return True
+    # Pre-build a set of all min_overlap-length windows from rc_b so each
+    # lookup in seq_a is O(k) rather than O(M).
+    rc_b_windows = {
+        rc_b[j : j + min_overlap]
+        for j in range(len(rc_b) - min_overlap + 1)
+    }
+    for i in range(len(seq_a) - min_overlap + 1):
+        if seq_a[i : i + min_overlap] in rc_b_windows:
+            return True
     return False
 
 

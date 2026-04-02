@@ -127,6 +127,25 @@ class TestFindComplementaryPairs:
         pairs = find_complementary_pairs(oligos, names, min_overlap=1)
         assert set(pairs.keys()) == {"x", "y", "z"}
 
+    def test_internal_complementarity_detected(self) -> None:
+        # The complementary region (ATCG / CGAT) is buried inside both oligos,
+        # not at either 5' or 3' end.  The function must detect it.
+        seq_a = "AAAAATCGAAAAAAAAA"   # ATCG at positions 5-8
+        seq_b = "GGGGGCGATGGGGGGGGG"  # CGAT at positions 5-8 (RC of ATCG)
+        oligos = [DNA(seq_a), DNA(seq_b)]
+        names = ["o1", "o2"]
+        pairs = find_complementary_pairs(oligos, names, min_overlap=4)
+        assert "o2" in pairs["o1"]
+        assert "o1" in pairs["o2"]
+
+    def test_short_oligos_below_min_overlap_no_pair(self) -> None:
+        # Both sequences are shorter than min_overlap; no pair should be reported
+        oligos = [DNA("ACGT"), DNA("ACGT")]
+        names = ["a", "b"]
+        pairs = find_complementary_pairs(oligos, names, min_overlap=10)
+        assert pairs["a"] == []
+        assert pairs["b"] == []
+
 
 # ---------------------------------------------------------------------------
 # analyse_oligo
