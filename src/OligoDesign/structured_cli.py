@@ -23,6 +23,7 @@ import sys
 
 from .oligo import write_fasta, write_json, write_tsv
 from .structured import (
+    SPACER_LENGTHS,
     StructuredOligo,
     generate_at_rich_palindrome,
     generate_inverted_repeat,
@@ -230,6 +231,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--inner-half-length must be >= 1")
     if args.spacer_length < 0:
         parser.error("--spacer-length must be >= 0")
+    if args.spacer_length not in SPACER_LENGTHS:
+        parser.error(
+            f"--spacer-length must be one of {list(SPACER_LENGTHS)}, "
+            f"got {args.spacer_length}"
+        )
 
     rng = random.Random(args.seed)
 

@@ -205,9 +205,12 @@ class DNA:
         Raises
         ------
         IndexError
-            If *start* or *end* are outside the valid range.
+            If *start* or *end* are outside the valid range ``[1, len(self)]``.
+            This check is applied before the ``start > end`` check, so
+            out-of-range positions always raise :exc:`IndexError` even when
+            *start* > *end*.
         ValueError
-            If *start* > *end*.
+            If *start* > *end* (and both are in range).
 
         Examples
         --------
@@ -217,7 +220,7 @@ class DNA:
         'ACGT'
         """
         n = len(self._sequence)
-        if start < 1 or end > n:
+        if start < 1 or start > n or end < 1 or end > n:
             raise IndexError(
                 f"Slice [{start}:{end}] is out of range for a sequence of length {n}. "
                 f"Valid 1-based positions are 1 to {n}."
@@ -442,7 +445,12 @@ class DNA:
         Parameters
         ----------
         min_length:
-            Minimum consecutive run length. Default is 4.
+            Minimum consecutive run length.  Must be >= 1.  Default is 4.
+
+        Raises
+        ------
+        ValueError
+            If *min_length* < 1.
 
         Examples
         --------
@@ -451,6 +459,8 @@ class DNA:
         >>> DNA("ACGT").has_homopolymer(min_length=4)
         False
         """
+        if min_length < 1:
+            raise ValueError(f"min_length must be >= 1, got {min_length}")
         return self.longest_homopolymer() >= min_length
 
     def is_low_complexity(self, window: int = 10, threshold: float = 0.7) -> bool:
@@ -462,10 +472,16 @@ class DNA:
         Parameters
         ----------
         window:
-            Window size in bases. Default is 10.
+            Window size in bases.  Must be >= 1.  Default is 10.
         threshold:
             Dominant-base fraction at or above which a window is
-            considered low complexity. Default is 0.7.
+            considered low complexity.  Must be between 0.0 and 1.0
+            inclusive.  Default is 0.7.
+
+        Raises
+        ------
+        ValueError
+            If *window* < 1 or *threshold* is outside [0.0, 1.0].
 
         Examples
         --------
@@ -474,6 +490,12 @@ class DNA:
         >>> DNA("ACGTACGTAC").is_low_complexity(window=10, threshold=0.7)
         False
         """
+        if window < 1:
+            raise ValueError(f"window must be >= 1, got {window}")
+        if not (0.0 <= threshold <= 1.0):
+            raise ValueError(
+                f"threshold must be between 0.0 and 1.0 inclusive, got {threshold}"
+            )
         seq = self._sequence
         n = len(seq)
         if n == 0:
@@ -583,6 +605,11 @@ class DNA:
             than 2 bases or sequences composed entirely of non-ACGT
             characters.
 
+        Raises
+        ------
+        ValueError
+            If *na_conc* <= 0 or *oligo_conc* <= 0.
+
         Notes
         -----
         The *Tm* is calculated as::
@@ -615,6 +642,14 @@ class DNA:
         >>> 30.0 < dna.melting_temperature() < 50.0
         True
         """
+        if na_conc <= 0:
+            raise ValueError(
+                f"na_conc must be > 0 (in molar), got {na_conc}"
+            )
+        if oligo_conc <= 0:
+            raise ValueError(
+                f"oligo_conc must be > 0 (in molar), got {oligo_conc}"
+            )
         seq = self._sequence
         # Keep only unambiguous bases for the NN calculation
         acgt = "".join(b for b in seq if b in VALID_BASES)

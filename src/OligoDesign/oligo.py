@@ -97,15 +97,22 @@ def has_tandem_repeat(
     dna:
         The DNA sequence to test.
     min_unit:
-        Minimum repeat-unit length in bases.  Default is 2.
+        Minimum repeat-unit length in bases.  Must be >= 1.  Default is 2.
     max_unit:
-        Maximum repeat-unit length in bases.  Default is 4.
+        Maximum repeat-unit length in bases.  Must be >= *min_unit*.
+        Default is 4.
     min_count:
-        Minimum number of consecutive copies required.  Default is 3.
+        Minimum number of consecutive copies required.  Must be >= 2.
+        Default is 3.
 
     Returns
     -------
     bool
+
+    Raises
+    ------
+    ValueError
+        If *min_unit* < 1, *max_unit* < *min_unit*, or *min_count* < 2.
 
     Examples
     --------
@@ -114,6 +121,14 @@ def has_tandem_repeat(
     >>> has_tandem_repeat(DNA("ACGTACGT"))  # only 2 repeats of ACGT
     False
     """
+    if min_unit < 1:
+        raise ValueError(f"min_unit must be >= 1, got {min_unit}")
+    if max_unit < min_unit:
+        raise ValueError(
+            f"max_unit must be >= min_unit ({min_unit}), got {max_unit}"
+        )
+    if min_count < 2:
+        raise ValueError(f"min_count must be >= 2, got {min_count}")
     seq = str(dna)
     for unit_len in range(min_unit, max_unit + 1):
         repeat_len = unit_len * min_count
@@ -130,7 +145,15 @@ def has_tandem_repeat(
 
 
 def _complementarity_score(seq_a: str, seq_b: str, min_overlap: int) -> bool:
-    """Return True if *seq_a* and *seq_b* share >= *min_overlap* complementary bases."""
+    """Return True if *seq_a* and *seq_b* share >= *min_overlap* complementary bases.
+
+    Raises
+    ------
+    ValueError
+        If *min_overlap* < 1.
+    """
+    if min_overlap < 1:
+        raise ValueError(f"min_overlap must be >= 1, got {min_overlap}")
     if len(seq_a) < min_overlap or len(seq_b) < min_overlap:
         return False
     # Build the reverse complement of seq_b.  Any substring of seq_a that
@@ -160,15 +183,34 @@ def find_complementary_pairs(
     oligos:
         List of :class:`~OligoDesign.dna.DNA` objects.
     names:
-        Names for each oligo (same order as *oligos*).
+        Names for each oligo (same order as *oligos*).  Must have the same
+        length as *oligos* and all names must be unique.
     min_overlap:
-        Minimum length of complementary overlap to flag.  Default is 10.
+        Minimum length of complementary overlap to flag.  Must be >= 1.
+        Default is 10.
 
     Returns
     -------
     dict[str, list[str]]
         Mapping of oligo name to list of names of complementary partners.
+
+    Raises
+    ------
+    ValueError
+        If ``len(oligos) != len(names)``, if any names are duplicated, or
+        if *min_overlap* < 1.
     """
+    if len(oligos) != len(names):
+        raise ValueError(
+            f"oligos and names must have the same length, "
+            f"got {len(oligos)} oligos and {len(names)} names"
+        )
+    if len(set(names)) != len(names):
+        seen: set[str] = set()
+        duplicates = [n for n in names if n in seen or seen.add(n)]  # type: ignore[func-returns-value]
+        raise ValueError(f"names must be unique; duplicates found: {duplicates!r}")
+    if min_overlap < 1:
+        raise ValueError(f"min_overlap must be >= 1, got {min_overlap}")
     result: dict[str, list[str]] = {name: [] for name in names}
     seqs = [str(o) for o in oligos]
     for i in range(len(oligos)):

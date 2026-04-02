@@ -542,3 +542,92 @@ class TestMeltingTemperature:
         tm = DNA("ACGT").melting_temperature()
         assert tm is not None
         assert abs(tm - (-55.77)) < 0.1, f"Expected ≈-55.77, got {tm:.2f}"
+
+
+# ---------------------------------------------------------------------------
+# Edge-case validation (new)
+# ---------------------------------------------------------------------------
+
+
+class TestIsLowComplexityValidation:
+    def test_window_zero_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="window must be >= 1"):
+            DNA("ACGT").is_low_complexity(window=0)
+
+    def test_window_negative_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="window must be >= 1"):
+            DNA("ACGT").is_low_complexity(window=-1)
+
+    def test_threshold_negative_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="threshold"):
+            DNA("ACGT").is_low_complexity(threshold=-0.1)
+
+    def test_threshold_above_one_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="threshold"):
+            DNA("ACGT").is_low_complexity(threshold=1.1)
+
+    def test_threshold_zero_is_valid(self) -> None:
+        # threshold=0.0 is the boundary; every window will be "low complexity"
+        assert DNA("ACGT").is_low_complexity(threshold=0.0) is True
+
+    def test_threshold_one_is_valid(self) -> None:
+        # threshold=1.0 only triggers for a pure homopolymer window
+        assert DNA("AAAA").is_low_complexity(window=4, threshold=1.0) is True
+        assert DNA("ACGT").is_low_complexity(window=4, threshold=1.0) is False
+
+
+class TestHasHomopolymerValidation:
+    def test_min_length_zero_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_length must be >= 1"):
+            DNA("ACGT").has_homopolymer(min_length=0)
+
+    def test_min_length_negative_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_length must be >= 1"):
+            DNA("ACGT").has_homopolymer(min_length=-1)
+
+    def test_min_length_one_is_valid(self) -> None:
+        # Every non-empty sequence has at least one run of length 1
+        assert DNA("ACGT").has_homopolymer(min_length=1) is True
+
+
+class TestSlice1OutOfRangePrecedence:
+    def test_start_and_end_both_out_of_range_raises_index_error(self) -> None:
+        # start > end but both out of range: IndexError must be raised
+        with pytest.raises(IndexError):
+            DNA("ACGT").slice_1(5, 10)
+
+    def test_start_out_of_range_end_valid_raises_index_error(self) -> None:
+        with pytest.raises(IndexError):
+            DNA("ACGT").slice_1(0, 2)
+
+    def test_end_out_of_range_start_valid_raises_index_error(self) -> None:
+        with pytest.raises(IndexError):
+            DNA("ACGT").slice_1(1, 5)
+
+    def test_start_greater_than_end_both_in_range_raises_value_error(self) -> None:
+        # Both positions are valid but start > end: ValueError
+        with pytest.raises(ValueError):
+            DNA("ACGT").slice_1(3, 2)
+
+    def test_start_out_of_range_and_start_greater_than_end_raises_index_error(self) -> None:
+        # start=6, end=3 on a 4-base sequence: out-of-range check fires first
+        with pytest.raises(IndexError):
+            DNA("ACGT").slice_1(6, 3)
+
+
+class TestMeltingTemperatureValidation:
+    def test_zero_na_conc_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="na_conc"):
+            DNA("ACGTACGT").melting_temperature(na_conc=0.0)
+
+    def test_negative_na_conc_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="na_conc"):
+            DNA("ACGTACGT").melting_temperature(na_conc=-0.05)
+
+    def test_zero_oligo_conc_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="oligo_conc"):
+            DNA("ACGTACGT").melting_temperature(oligo_conc=0.0)
+
+    def test_negative_oligo_conc_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="oligo_conc"):
+            DNA("ACGTACGT").melting_temperature(oligo_conc=-1e-9)

@@ -431,3 +431,127 @@ class TestStructuredCLI:
         ])
         data = json.loads(open(path).read())
         assert all(item["name"].startswith("myoligo") for item in data)
+
+
+# ---------------------------------------------------------------------------
+# Edge-case validation: spacer-length enforcement (new)
+# ---------------------------------------------------------------------------
+
+
+class TestSpacerLengthEnforcement:
+    """Generators must reject spacer lengths not in SPACER_LENGTHS = (0,2,3,4,5,6)."""
+
+    from OligoDesign.structured import SPACER_LENGTHS
+
+    def test_palindromic_motif_spacer_1_raises(self) -> None:
+        with pytest.raises(ValueError, match="spacer_length"):
+            generate_palindromic_motif(spacer_length=1)
+
+    def test_palindromic_motif_spacer_7_raises(self) -> None:
+        with pytest.raises(ValueError, match="spacer_length"):
+            generate_palindromic_motif(spacer_length=7)
+
+    def test_palindromic_motif_spacer_negative_raises(self) -> None:
+        with pytest.raises(ValueError, match="spacer_length"):
+            generate_palindromic_motif(spacer_length=-1)
+
+    def test_inverted_repeat_inner_spacer_1_raises(self) -> None:
+        with pytest.raises(ValueError, match="inner_spacer_length"):
+            generate_inverted_repeat(inner_spacer_length=1)
+
+    def test_inverted_repeat_inner_spacer_7_raises(self) -> None:
+        with pytest.raises(ValueError, match="inner_spacer_length"):
+            generate_inverted_repeat(inner_spacer_length=7)
+
+    def test_inverted_repeat_inner_spacer_negative_raises(self) -> None:
+        with pytest.raises(ValueError, match="inner_spacer_length"):
+            generate_inverted_repeat(inner_spacer_length=-1)
+
+    def test_at_rich_palindrome_spacer_1_raises(self) -> None:
+        with pytest.raises(ValueError, match="spacer_length"):
+            generate_at_rich_palindrome(spacer_length=1)
+
+    def test_at_rich_palindrome_spacer_7_raises(self) -> None:
+        with pytest.raises(ValueError, match="spacer_length"):
+            generate_at_rich_palindrome(spacer_length=7)
+
+    def test_valid_spacer_0_accepted(self) -> None:
+        oligo = generate_palindromic_motif(spacer_length=0, rng=random.Random(1))
+        assert oligo.spacer == ""
+
+    def test_valid_spacer_6_accepted(self) -> None:
+        oligo = generate_palindromic_motif(spacer_length=6, rng=random.Random(1))
+        assert len(oligo.spacer) == 6
+
+
+class TestCLISpacerLengthEnforcement:
+    def test_spacer_length_1_exits_nonzero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["--spacer-length", "1"])
+        assert exc.value.code != 0
+
+    def test_spacer_length_7_exits_nonzero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["--spacer-length", "7"])
+        assert exc.value.code != 0
+
+    def test_spacer_length_valid_0_succeeds(self) -> None:
+        assert main(["--spacer-length", "0", "--quiet", "--seed", "1"]) == 0
+
+    def test_spacer_length_valid_4_succeeds(self) -> None:
+        assert main(["--spacer-length", "4", "--quiet", "--seed", "1"]) == 0
+
+
+# ---------------------------------------------------------------------------
+# Structured hairpin with N-spacer (new)
+# ---------------------------------------------------------------------------
+
+
+class TestStructuredHairpinNSpacer:
+    """Verify that has_hairpin handles N-spacer bases correctly."""
+
+    def test_n_in_loop_does_not_prevent_hairpin_detection(self) -> None:
+        # Build an oligo with a clear stem and an N-containing loop.
+        # Stem: AAAACCC + N*4 loop + GGGTTTT is NOT a hairpin (no complementarity).
+        # Build a real one: AAAACCCC + NNNN + GGGGTTTT should not match.
+        # Use a sequence where N occupies loop positions but stems are real.
+        # stem5=AAAA loop=NNNNN stem3=TTTT -> has_hairpin must find it
+        # since 'N' in stem3 positions means RC('AAAA')='TTTT' != 'NNNN'.
+        # So: AAAA + NNN + TTTT should be detected.
+        oligo = StructuredOligo(
+            sequence="AAAANNNTTTT",
+            oligo_type="at_rich_palindrome",
+            left_arm="AAAA",
+            right_arm="TTTT",
+            spacer="NNN",
+            inner_left="",
+            inner_right="",
+        )
+        # stem5=AAAA, loop=NNN (3 bases), stem3=TTTT; RC('AAAA')='TTTT' == stem3
+        assert oligo.has_hairpin is True
+
+    def test_n_in_stem_position_blocks_hairpin(self) -> None:
+        # Replace one stem base with N to break complementarity.
+        # Sequence: NAAA + NNN + TTTA  (3-base stem at most, below min_stem=4)
+        oligo = StructuredOligo(
+            sequence="NAAANNNTTTN",
+            oligo_type="at_rich_palindrome",
+            left_arm="NAAA",
+            right_arm="TTTN",
+            spacer="NNN",
+            inner_left="",
+            inner_right="",
+        )
+        # No 4-base stem can form because N ≠ complement of any base
+        assert oligo.has_hairpin is False
+
+    def test_n_only_spacer_preserves_loop_geometry(self) -> None:
+        # generate_at_rich_palindrome with a 4-base spacer should have correct
+        # loop geometry.  The N spacer is the loop; the arms are the stem.
+        # With half_length=6 the arms are 6 AT bases; the full stem is 6 bp.
+        oligo = generate_at_rich_palindrome(
+            half_length=6, spacer_length=4, rng=random.Random(0)
+        )
+        # 6-base AT arm + 4N spacer + 6-base AT arm -> stem len 6, loop len 4
+        # has_hairpin should be True (min_stem=4, loop=4 which is in [3,8])
+        assert oligo.has_hairpin is True

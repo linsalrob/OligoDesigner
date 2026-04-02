@@ -639,3 +639,59 @@ class TestSequenceLogo:
         path = str(tmp_path / "logo_structured.png")
         sequence_logo(oligos, path)
         assert os.path.exists(path)
+
+
+# ---------------------------------------------------------------------------
+# Edge-case validation for has_tandem_repeat (new)
+# ---------------------------------------------------------------------------
+
+
+class TestHasTandemRepeatValidation:
+    def test_min_unit_zero_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_unit"):
+            has_tandem_repeat(DNA("ATATAT"), min_unit=0)
+
+    def test_min_unit_negative_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_unit"):
+            has_tandem_repeat(DNA("ATATAT"), min_unit=-1)
+
+    def test_max_unit_less_than_min_unit_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="max_unit"):
+            has_tandem_repeat(DNA("ATATAT"), min_unit=4, max_unit=2)
+
+    def test_min_count_one_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_count"):
+            has_tandem_repeat(DNA("ATATAT"), min_count=1)
+
+    def test_min_count_zero_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_count"):
+            has_tandem_repeat(DNA("ATATAT"), min_count=0)
+
+    def test_min_count_two_is_valid(self) -> None:
+        # ACGTACGT = 2 copies of ACGT; min_count=2 should be valid and return True
+        assert has_tandem_repeat(DNA("ACGTACGT"), min_unit=4, max_unit=4, min_count=2) is True
+
+
+# ---------------------------------------------------------------------------
+# Edge-case validation for find_complementary_pairs (new)
+# ---------------------------------------------------------------------------
+
+
+class TestFindComplementaryPairsValidation:
+    def test_min_overlap_zero_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_overlap"):
+            find_complementary_pairs([DNA("ACGT")], ["o1"], min_overlap=0)
+
+    def test_min_overlap_negative_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="min_overlap"):
+            find_complementary_pairs([DNA("ACGT")], ["o1"], min_overlap=-5)
+
+    def test_names_length_mismatch_raises_value_error(self) -> None:
+        oligos = [DNA("ACGT"), DNA("TTTT")]
+        with pytest.raises(ValueError, match="same length"):
+            find_complementary_pairs(oligos, ["o1"])
+
+    def test_duplicate_names_raises_value_error(self) -> None:
+        oligos = [DNA("ACGT"), DNA("TTTT")]
+        with pytest.raises(ValueError, match="unique"):
+            find_complementary_pairs(oligos, ["o1", "o1"])
