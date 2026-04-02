@@ -64,6 +64,11 @@ _AT_BASES = "AT"
 # Recommended spacer lengths for structured oligos
 SPACER_LENGTHS: tuple[int, ...] = (0, 2, 3, 4, 5, 6)
 
+# Complement table used by the hairpin scanner (ACGT only; N has no mapping)
+_HAIRPIN_COMPLEMENT_TABLE: dict[int, int] = str.maketrans("ACGT", "TGCA")
+# Frozenset of unambiguous bases for stem validation
+_ACGT_SET: frozenset[str] = frozenset("ACGT")
+
 
 def _random_seq(length: int, bases: str, rng: random.Random) -> str:
     """Return a random sequence of *length* drawn from *bases*."""
@@ -193,8 +198,6 @@ class StructuredOligo:
         seq = self.sequence
         n = len(seq)
         min_stem, min_loop, max_loop = 4, 3, 8
-        _comp = str.maketrans("ACGT", "TGCA")
-        _acgt = frozenset("ACGT")
         for stem_len in range(min_stem, n // 2 + 1):
             for loop_len in range(min_loop, max_loop + 1):
                 required = 2 * stem_len + loop_len
@@ -204,11 +207,11 @@ class StructuredOligo:
                     stem5 = seq[i : i + stem_len]
                     stem3 = seq[i + stem_len + loop_len : i + required]
                     # Reject if either stem contains non-ACGT bases (e.g. N)
-                    if not frozenset(stem5).issubset(_acgt):
+                    if not frozenset(stem5).issubset(_ACGT_SET):
                         continue
-                    if not frozenset(stem3).issubset(_acgt):
+                    if not frozenset(stem3).issubset(_ACGT_SET):
                         continue
-                    rc_stem5 = stem5[::-1].translate(_comp)
+                    rc_stem5 = stem5[::-1].translate(_HAIRPIN_COMPLEMENT_TABLE)
                     if stem3 == rc_stem5:
                         return True
         return False

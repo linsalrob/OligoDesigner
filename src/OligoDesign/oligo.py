@@ -207,7 +207,12 @@ def find_complementary_pairs(
         )
     if len(set(names)) != len(names):
         seen: set[str] = set()
-        duplicates = [n for n in names if n in seen or seen.add(n)]  # type: ignore[func-returns-value]
+        duplicates: list[str] = []
+        for n in names:
+            if n in seen:
+                duplicates.append(n)
+            else:
+                seen.add(n)
         raise ValueError(f"names must be unique; duplicates found: {duplicates!r}")
     if min_overlap < 1:
         raise ValueError(f"min_overlap must be >= 1, got {min_overlap}")
