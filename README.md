@@ -12,6 +12,12 @@ cd OligoDesign
 pip install .
 ```
 
+To also install the optional visualisation dependencies needed for sequence logo generation:
+
+```bash
+pip install ".[viz]"
+```
+
 Python 3.10 or higher is required.
 
 ## Command-line Tools
@@ -133,7 +139,9 @@ from OligoDesign import (
     find_complementary_pairs,
     has_tandem_repeat,
     write_fasta, write_json, write_tsv,
+    read_json,
     OligoAnalysis,
+    sequence_logo,
 )
 from OligoDesign.structured import (
     generate_palindromic_motif,
@@ -147,14 +155,18 @@ from OligoDesign.structured import (
 
 ```python
 dna = DNA("ATCGATCGATCG")
-dna.gc_content()          # float: 0.5
-dna.entropy()             # float: Shannon entropy (bits)
-dna.complement()          # DNA object
-dna.reverse_complement()  # DNA object
-dna.has_hairpin()         # bool (configurable stem/loop sizes)
-dna.has_homopolymer()     # bool
+dna.gc_content()             # float: fraction of G+C bases (0.0–1.0)
+dna.entropy()                # float: Shannon entropy in bits (0.0–2.0)
+dna.melting_temperature()    # float | None: nearest-neighbor Tm in °C
+dna.base_composition()       # dict[str, int]: {"A": n, "C": n, "G": n, "T": n}
+dna.longest_homopolymer()    # int: length of longest single-base run
+dna.complement()             # DNA object
+dna.reverse_complement()     # DNA object
+dna.has_hairpin()            # bool (configurable stem/loop sizes)
+dna.has_homopolymer()        # bool
+dna.is_low_complexity()      # bool (configurable window and threshold)
 dna.is_self_complementary()  # bool
-dna.find_motif("ATCG")   # list[int] of 0-based positions
+dna.find_motif("ATCG")      # list[int] of 0-based positions
 ```
 
 ### Generating and analysing random oligos
@@ -178,7 +190,29 @@ pairs = find_complementary_pairs(oligos, names, min_overlap=10)
 write_fasta(analyses, "oligos.fa")
 write_json(analyses, "oligos.json")
 write_tsv(analyses, "oligos.tsv")
+
+# Read a previously written JSON file back into OligoAnalysis objects
+analyses = read_json("oligos.json")
 ```
+
+#### `OligoAnalysis` fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `str` | Sequence identifier |
+| `sequence` | `str` | DNA sequence (uppercase) |
+| `length` | `int` | Sequence length in bases |
+| `gc_content` | `float` | Fraction of G+C bases (0.0–1.0) |
+| `entropy` | `float` | Shannon entropy in bits (0.0–2.0) |
+| `tm` | `float \| None` | Nearest-neighbor melting temperature in °C |
+| `base_composition` | `dict` | Per-base counts `{"A": n, "C": n, "G": n, "T": n}` |
+| `longest_homopolymer` | `int` | Length of the longest single-base run |
+| `has_homopolymer` | `bool` | `True` if a homopolymer run meets the minimum length threshold |
+| `is_low_complexity` | `bool` | `True` if any sliding window is dominated by a single base |
+| `is_palindrome` | `bool` | `True` if the sequence equals its own reverse complement |
+| `has_hairpin` | `bool` | `True` if a potential hairpin structure was detected |
+| `has_tandem_repeat` | `bool` | `True` if a tandem repeat of a short motif was detected |
+| `complementary_to` | `list[str]` | Names of cross-complementary oligos in the same set |
 
 ### Generating structured oligos
 
@@ -192,6 +226,80 @@ at_rich        = generate_at_rich_palindrome(half_length=6, spacer_length=2, rng
 print(palindrome.sequence)       # e.g. "ATCGCG  CGCGAT"
 print(palindrome.is_palindrome)  # True
 ```
+
+## Sequence logo images
+
+Sequence logos visualise the nucleotide frequency (or information content) at each position across a collection of oligos.  The `sequence_logo` function reads a JSON file produced by `write_json` (or accepts an already-loaded list of oligo objects) and saves a PNG image.
+
+### Prerequisites
+
+Install the visualisation extras if you haven't already:
+
+```bash
+pip install ".[viz]"
+# or individually:
+pip install logomaker matplotlib
+```
+
+### Python API
+
+```python
+from OligoDesign import sequence_logo
+
+# From a JSON file written by generate-oligos or write_json
+sequence_logo("oligos.json", "logo.png")
+
+# From an in-memory list of OligoAnalysis or StructuredOligo objects
+sequence_logo(analyses, "logo.png")
+
+# Customise the logo
+sequence_logo(
+    "oligos.json",
+    "logo.png",
+    logo_type="information",   # "counts" | "probability" | "information"
+    title="My oligo set",
+    figsize=(12, 4),           # width × height in inches
+    color_scheme="classic",    # logomaker colour scheme
+    dpi=200,
+)
+```
+
+#### `sequence_logo` parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `source` | *(required)* | Path to a JSON file **or** a list of `OligoAnalysis` / `StructuredOligo` objects |
+| `output_path` | *(required)* | Destination path for the PNG file |
+| `logo_type` | `"counts"` | Logo style: `"counts"`, `"probability"`, or `"information"` (bits) |
+| `title` | `""` | Optional title displayed above the logo |
+| `figsize` | `(10.0, 3.0)` | Figure size in inches `(width, height)` |
+| `color_scheme` | `"classic"` | [logomaker](https://logomaker.readthedocs.io) colour scheme name |
+| `dpi` | `150` | Output resolution in dots per inch |
+
+#### Logo types
+
+| `logo_type` | Y-axis | Description |
+|-------------|--------|-------------|
+| `"counts"` | Count | Raw nucleotide counts at each position |
+| `"probability"` | Probability | Fraction of each base at each position |
+| `"information"` | Bits | Information-content weighted heights (max 2 bits per position) |
+
+#### Example workflow
+
+```bash
+# Step 1 – generate oligos and save to JSON
+generate-oligos --count 50 --length 40 --seed 1 --json oligos.json
+
+# Step 2 – create sequence logo from the JSON file (Python)
+python - <<'EOF'
+from OligoDesign import sequence_logo
+sequence_logo("oligos.json", "logo.png", logo_type="information", title="Random oligos")
+EOF
+```
+
+---
+
+
 
 ## Output formats
 

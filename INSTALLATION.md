@@ -19,6 +19,14 @@ This installs the `OligoDesign` package and registers two command-line tools:
 - `generate-oligos`
 - `generate-structured-oligos`
 
+## Optional: Visualisation dependencies
+
+To generate sequence logo images you need the `viz` optional extra (installs `logomaker` and `matplotlib`):
+
+```bash
+pip install ".[viz]"
+```
+
 ## Development Install
 
 To install in editable mode (so that changes to the source are reflected immediately without reinstalling):
@@ -29,7 +37,14 @@ cd OligoDesign
 pip install -e ".[dev]"
 ```
 
+To install with all extras (development tools + visualisation):
+
+```bash
+pip install -e ".[dev,viz]"
+```
+
 The `[dev]` extra installs [pytest](https://docs.pytest.org/) so you can run the test suite.
+The `[viz]` extra installs `logomaker` and `matplotlib` for sequence logo generation.
 
 ## Verify the Installation
 
