@@ -1,7 +1,7 @@
 """Sequence logo generation from oligonucleotide collections.
 
 Provides :func:`sequence_logo`, which reads a JSON file produced by
-:func:`~OligoDesign.oligo.write_json` (or accepts an already-loaded list
+:func:`~OligoDesigner.oligo.write_json` (or accepts an already-loaded list
 of oligo objects) and writes a PNG sequence logo to disk.
 
 The logo is built using `logomaker <https://logomaker.readthedocs.io>`_ and
@@ -13,14 +13,14 @@ Usage
 -----
 ::
 
-    from OligoDesign.sequence_logo import sequence_logo
+    from OligoDesigner.sequence_logo import sequence_logo
 
     # From a JSON file produced by write_json / generate-oligos
     sequence_logo("oligos.json", "logo.png")
 
     # From an already-loaded list of oligo objects
-    from OligoDesign.oligo import analyse_oligo, read_json
-    from OligoDesign.dna import DNA
+    from OligoDesigner.oligo import analyse_oligo, read_json
+    from OligoDesigner.dna import DNA
     oligos = [analyse_oligo(DNA("ACGTACGT"), name="o1")]
     sequence_logo(oligos, "logo.png")
 """
@@ -85,10 +85,10 @@ def sequence_logo(
     """Generate a PNG sequence logo from a collection of oligonucleotides.
 
     The input can be either the path to a JSON file previously written by
-    :func:`~OligoDesign.oligo.write_json` or an already-loaded list of oligo
+    :func:`~OligoDesigner.oligo.write_json` or an already-loaded list of oligo
     objects (anything with a ``sequence`` attribute, e.g.
-    :class:`~OligoDesign.oligo.OligoAnalysis` or
-    :class:`~OligoDesign.structured.StructuredOligo`).
+    :class:`~OligoDesigner.oligo.OligoAnalysis` or
+    :class:`~OligoDesigner.structured.StructuredOligo`).
 
     When sequences differ in length the logo is drawn over the region covered
     by *all* sequences (i.e. truncated to the shortest sequence length).
@@ -127,9 +127,9 @@ def sequence_logo(
     Examples
     --------
     >>> import os, tempfile, random
-    >>> from OligoDesign.oligo import analyse_oligo, write_json
-    >>> from OligoDesign.dna import DNA
-    >>> from OligoDesign.sequence_logo import sequence_logo
+    >>> from OligoDesigner.oligo import analyse_oligo, write_json
+    >>> from OligoDesigner.dna import DNA
+    >>> from OligoDesigner.sequence_logo import sequence_logo
     >>> oligos = [analyse_oligo(DNA("ACGTACGT"), name=f"o{i}") for i in range(3)]
     >>> with tempfile.TemporaryDirectory() as d:
     ...     json_path = os.path.join(d, "oligos.json")

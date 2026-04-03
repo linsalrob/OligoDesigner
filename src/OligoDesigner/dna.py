@@ -1,4 +1,4 @@
-"""Core DNA sequence object for the OligoDesign library."""
+"""Core DNA sequence object for the OligoDesigner library."""
 
 from __future__ import annotations
 

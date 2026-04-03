@@ -1,14 +1,14 @@
-# OligoDesign
+# OligoDesigner
 
-A Python library and command-line toolkit for designing DNA oligonucleotides for phage screens. OligoDesign generates random and structured oligos, analyses them for problematic secondary-structure features (hairpins, homopolymers, low-complexity regions, tandem repeats, and cross-complementarity), and writes results to FASTA, JSON, and TSV formats.
+A Python library and command-line toolkit for designing DNA oligonucleotides for phage screens. OligoDesigner generates random and structured oligos, analyses them for problematic secondary-structure features (hairpins, homopolymers, low-complexity regions, tandem repeats, and cross-complementarity), and writes results to FASTA, JSON, and TSV formats.
 
 ## Installation
 
 See [INSTALLATION.md](INSTALLATION.md) for full instructions. In short:
 
 ```bash
-git clone https://github.com/linsalrob/OligoDesign.git
-cd OligoDesign
+git clone https://github.com/linsalrob/OligoDesigner.git
+cd OligoDesigner
 pip install .
 ```
 
@@ -129,10 +129,10 @@ generate-structured-oligos --type inverted_repeat -n 5 \
 
 ## Python API
 
-OligoDesign is designed as a library first. The following public classes and functions are available after `pip install .`:
+OligoDesigner is designed as a library first. The following public classes and functions are available after `pip install .`:
 
 ```python
-from OligoDesign import (
+from OligoDesigner import (
     DNA,
     random_oligo,
     analyse_oligo,
@@ -143,7 +143,7 @@ from OligoDesign import (
     OligoAnalysis,
     sequence_logo,
 )
-from OligoDesign.structured import (
+from OligoDesigner.structured import (
     generate_palindromic_motif,
     generate_inverted_repeat,
     generate_at_rich_palindrome,
@@ -244,7 +244,7 @@ pip install logomaker matplotlib
 ### Python API
 
 ```python
-from OligoDesign import sequence_logo
+from OligoDesigner import sequence_logo
 
 # From a JSON file written by generate-oligos or write_json
 sequence_logo("oligos.json", "logo.png")
@@ -292,7 +292,7 @@ generate-oligos --count 50 --length 40 --seed 1 --json oligos.json
 
 # Step 2 – create sequence logo from the JSON file (Python)
 python - <<'EOF'
-from OligoDesign import sequence_logo
+from OligoDesigner import sequence_logo
 sequence_logo("oligos.json", "logo.png", logo_type="information", title="Random oligos")
 EOF
 ```

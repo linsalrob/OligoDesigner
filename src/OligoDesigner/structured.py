@@ -16,24 +16,24 @@ All generator functions return a :class:`StructuredOligo` dataclass that
 carries the full sequence, individual component parts, and pre-computed
 structural analysis fields.
 
-Use the shared output helpers :func:`~OligoDesign.oligo.write_fasta`,
-:func:`~OligoDesign.oligo.write_json`, and
-:func:`~OligoDesign.oligo.write_tsv` from :mod:`OligoDesign.oligo` to write
+Use the shared output helpers :func:`~OligoDesigner.oligo.write_fasta`,
+:func:`~OligoDesigner.oligo.write_json`, and
+:func:`~OligoDesigner.oligo.write_tsv` from :mod:`OligoDesigner.oligo` to write
 results to FASTA, JSON, or TSV files — the same functions used for random
 oligos work here because :class:`StructuredOligo` satisfies the
-:class:`~OligoDesign.oligo.WritableOligo` protocol.
+:class:`~OligoDesigner.oligo.WritableOligo` protocol.
 
 Usage
 -----
 ::
 
     import random
-    from OligoDesign.structured import (
+    from OligoDesigner.structured import (
         generate_palindromic_motif,
         generate_inverted_repeat,
         generate_at_rich_palindrome,
     )
-    from OligoDesign.oligo import write_fasta, write_json, write_tsv
+    from OligoDesigner.oligo import write_fasta, write_json, write_tsv
 
     rng = random.Random(42)
     oligos = [
@@ -89,10 +89,10 @@ def _rc(seq: str) -> str:
 class StructuredOligo:
     """A structured oligonucleotide with defined internal symmetry.
 
-    Satisfies the :class:`~OligoDesign.oligo.WritableOligo` protocol, so
-    instances can be passed directly to :func:`~OligoDesign.oligo.write_fasta`,
-    :func:`~OligoDesign.oligo.write_json`, and
-    :func:`~OligoDesign.oligo.write_tsv`.
+    Satisfies the :class:`~OligoDesigner.oligo.WritableOligo` protocol, so
+    instances can be passed directly to :func:`~OligoDesigner.oligo.write_fasta`,
+    :func:`~OligoDesigner.oligo.write_json`, and
+    :func:`~OligoDesigner.oligo.write_tsv`.
 
     Attributes
     ----------

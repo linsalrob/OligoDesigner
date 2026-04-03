@@ -1,4 +1,4 @@
-"""Tests for OligoDesign.oligo and OligoDesign.cli."""
+"""Tests for OligoDesigner.oligo and OligoDesigner.cli."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import random
 
 import pytest
 
-from OligoDesign.dna import DNA
-from OligoDesign.oligo import (
+from OligoDesigner.dna import DNA
+from OligoDesigner.oligo import (
     OligoAnalysis,
     analyse_oligo,
     find_complementary_pairs,
@@ -20,7 +20,7 @@ from OligoDesign.oligo import (
     write_json,
     write_tsv,
 )
-from OligoDesign.cli import main
+from OligoDesigner.cli import main
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ class TestWriteOutputs:
 
     def test_write_tsv_mixed_schema_raises(self, tmp_path) -> None:
         """Mixing OligoAnalysis with StructuredOligo in one write_tsv call must fail."""
-        from OligoDesign.structured import generate_palindromic_motif
+        from OligoDesigner.structured import generate_palindromic_motif
         import random as _random
         path = str(tmp_path / "out.tsv")
         mixed = [
@@ -482,7 +482,7 @@ class TestReadJson:
         assert read_json(path) == []
 
     def test_reads_structured_oligos(self, tmp_path) -> None:
-        from OligoDesign.structured import StructuredOligo, generate_palindromic_motif
+        from OligoDesigner.structured import StructuredOligo, generate_palindromic_motif
 
         oligos = [generate_palindromic_motif(rng=random.Random(i)) for i in range(3)]
         for i, o in enumerate(oligos):
@@ -495,7 +495,7 @@ class TestReadJson:
             assert isinstance(obj, StructuredOligo)
 
     def test_structured_sequence_preserved(self, tmp_path) -> None:
-        from OligoDesign.structured import generate_palindromic_motif
+        from OligoDesigner.structured import generate_palindromic_motif
 
         oligos = [generate_palindromic_motif(rng=random.Random(0))]
         oligos[0].name = "p0"
@@ -505,7 +505,7 @@ class TestReadJson:
         assert result[0].sequence == oligos[0].sequence
 
     def test_structured_oligo_type_preserved(self, tmp_path) -> None:
-        from OligoDesign.structured import generate_inverted_repeat
+        from OligoDesigner.structured import generate_inverted_repeat
 
         oligos = [generate_inverted_repeat(rng=random.Random(0))]
         path = str(tmp_path / "ir.json")
@@ -530,7 +530,7 @@ class TestReadJson:
     def test_mixed_collection_round_trip(self, tmp_path) -> None:
         """read_json must correctly handle a JSON file with both OligoAnalysis
         and StructuredOligo records — each record is typed independently."""
-        from OligoDesign.structured import StructuredOligo, generate_palindromic_motif
+        from OligoDesigner.structured import StructuredOligo, generate_palindromic_motif
 
         analysis = analyse_oligo(DNA("ACGTACGT"), name="random_oligo")
         structured = generate_palindromic_motif(half_length=6, rng=random.Random(0))
@@ -571,21 +571,21 @@ class TestSequenceLogo:
         ]
 
     def test_creates_png_file(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         path = str(tmp_path / "logo.png")
         sequence_logo(self._oligos(), path)
         assert os.path.exists(path)
 
     def test_png_file_non_empty(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         path = str(tmp_path / "logo.png")
         sequence_logo(self._oligos(), path)
         assert os.path.getsize(path) > 0
 
     def test_reads_from_json_path(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         json_path = str(tmp_path / "oligos.json")
         png_path = str(tmp_path / "logo.png")
@@ -594,43 +594,43 @@ class TestSequenceLogo:
         assert os.path.exists(png_path)
 
     def test_probability_logo_type(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         path = str(tmp_path / "logo_prob.png")
         sequence_logo(self._oligos(), path, logo_type="probability")
         assert os.path.exists(path)
 
     def test_information_logo_type(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         path = str(tmp_path / "logo_info.png")
         sequence_logo(self._oligos(), path, logo_type="information")
         assert os.path.exists(path)
 
     def test_invalid_logo_type_raises(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         path = str(tmp_path / "logo.png")
         with pytest.raises(ValueError, match="logo_type"):
             sequence_logo(self._oligos(), path, logo_type="invalid")
 
     def test_empty_list_raises(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         path = str(tmp_path / "logo.png")
         with pytest.raises(ValueError):
             sequence_logo([], path)
 
     def test_object_without_sequence_raises(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
+        from OligoDesigner.sequence_logo import sequence_logo
 
         path = str(tmp_path / "logo.png")
         with pytest.raises(ValueError, match="sequence"):
             sequence_logo([object()], path)
 
     def test_structured_oligos_source(self, tmp_path) -> None:
-        from OligoDesign.sequence_logo import sequence_logo
-        from OligoDesign.structured import generate_palindromic_motif
+        from OligoDesigner.sequence_logo import sequence_logo
+        from OligoDesigner.structured import generate_palindromic_motif
 
         oligos = [
             generate_palindromic_motif(half_length=8, rng=random.Random(i))

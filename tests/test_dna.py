@@ -1,8 +1,8 @@
-"""Tests for OligoDesign.dna.DNA."""
+"""Tests for OligoDesigner.dna.DNA."""
 
 import pytest
 
-from OligoDesign.dna import DNA
+from OligoDesigner.dna import DNA
 
 
 # ---------------------------------------------------------------------------

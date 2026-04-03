@@ -1,7 +1,7 @@
-# Copilot instructions for OligoDesign
+# Copilot instructions for OligoDesigner
 
 ## Repository purpose
-OligoDesign is a Python repository for building a robust DNA oligonucleotide design library and, over time, an application for designing synthetic DNA oligos.
+OligoDesigner is a Python repository for building a robust DNA oligonucleotide design library and, over time, an application for designing synthetic DNA oligos.
 
 The current priority is to create a reliable core sequence API centred on a `DNA` object, along with analysis and validation methods needed for oligo design. Our initial biological target is the design and evaluation of 40 bp DNA oligonucleotides for synthesis.
 
@@ -19,7 +19,7 @@ Focus development in this order:
 ## Core expectations
 - Primary language: Python
 - Test framework: `pytest`
-- Package name: `OligoDesign`
+- Package name: `OligoDesigner`
 - Design style: library first, application second
 - Keep biological logic separate from interface code
 - Prefer explicit, deterministic behaviour
@@ -29,7 +29,7 @@ Focus development in this order:
 Assume the repository will evolve into a normal Python package layout. Until a `pyproject.toml` exists, do not invent unnecessary packaging complexity, but write code that will fit naturally into a standard package structure.
 
 Preferred layout:
-- `OligoDesign/src` for package code
+- `OligoDesigner/src` for package code
 - `tests/` for `pytest` tests
 - `README.md` for overview and examples
 - `.github/` for automation and Copilot instructions

@@ -55,7 +55,7 @@ def random_oligo(length: int = 40, rng: Optional[random.Random] = None) -> DNA:
     Returns
     -------
     DNA
-        A new :class:`~OligoDesign.dna.DNA` object of the requested length.
+        A new :class:`~OligoDesigner.dna.DNA` object of the requested length.
 
     Raises
     ------
@@ -181,7 +181,7 @@ def find_complementary_pairs(
     Parameters
     ----------
     oligos:
-        List of :class:`~OligoDesign.dna.DNA` objects.
+        List of :class:`~OligoDesigner.dna.DNA` objects.
     names:
         Names for each oligo (same order as *oligos*).  Must have the same
         length as *oligos* and all names must be unique.
@@ -401,7 +401,7 @@ def _record_to_oligo(record: dict):
     """Convert a single JSON record to the appropriate oligo object.
 
     Detects the type per-record by the presence of the ``'oligo_type'`` key,
-    which is written only by :class:`~OligoDesign.structured.StructuredOligo`.
+    which is written only by :class:`~OligoDesigner.structured.StructuredOligo`.
 
     Raises
     ------
@@ -455,7 +455,7 @@ def read_json(path: str) -> list:
 
     Automatically detects whether each record contains
     :class:`OligoAnalysis` data (written by the random-oligo pipeline) or
-    :class:`~OligoDesign.structured.StructuredOligo` data (written by the
+    :class:`~OligoDesigner.structured.StructuredOligo` data (written by the
     structured-oligo pipeline) and returns the appropriate type for each
     record.  Mixed collections (containing both types) are handled correctly.
 
@@ -479,8 +479,8 @@ def read_json(path: str) -> list:
     Examples
     --------
     >>> import tempfile, os
-    >>> from OligoDesign.dna import DNA
-    >>> from OligoDesign.oligo import analyse_oligo, write_json, read_json
+    >>> from OligoDesigner.dna import DNA
+    >>> from OligoDesigner.oligo import analyse_oligo, write_json, read_json
     >>> with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as fh:
     ...     path = fh.name
     >>> write_json([analyse_oligo(DNA("ACGT"), name="o1")], path)
@@ -507,7 +507,7 @@ def write_fasta(analyses: list[WritableOligo], path: str) -> None:
 
     Accepts any list of objects that satisfy :class:`WritableOligo`
     (e.g. :class:`OligoAnalysis` or
-    :class:`~OligoDesign.structured.StructuredOligo`).
+    :class:`~OligoDesigner.structured.StructuredOligo`).
 
     Parameters
     ----------
@@ -561,7 +561,7 @@ def write_tsv(analyses: list[WritableOligo], path: str) -> None:
     TypeError
         If *analyses* contains objects with different TSV schemas (e.g. a
         mix of :class:`OligoAnalysis` and
-        :class:`~OligoDesign.structured.StructuredOligo`).
+        :class:`~OligoDesigner.structured.StructuredOligo`).
     """
     if not analyses:
         open(path, "w").close()
