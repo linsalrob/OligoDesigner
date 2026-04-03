@@ -1,4 +1,4 @@
-"""OligoDesign – DNA oligonucleotide design library."""
+"""OligoDesigner – DNA oligonucleotide design library."""
 
 from .dna import DNA
 from .oligo import (

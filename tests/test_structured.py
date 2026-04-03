@@ -1,4 +1,4 @@
-"""Tests for OligoDesign.structured and OligoDesign.structured_cli."""
+"""Tests for OligoDesigner.structured and OligoDesigner.structured_cli."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ import random
 
 import pytest
 
-from OligoDesign.structured import (
+from OligoDesigner.structured import (
     StructuredOligo,
     generate_at_rich_palindrome,
     generate_inverted_repeat,
     generate_palindromic_motif,
 )
-from OligoDesign.oligo import write_fasta, write_json, write_tsv
-from OligoDesign.structured_cli import main
+from OligoDesigner.oligo import write_fasta, write_json, write_tsv
+from OligoDesigner.structured_cli import main
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ class TestGeneratePalindromicMotif:
 
     def test_right_arm_is_rc_of_left(self) -> None:
         oligo = generate_palindromic_motif(half_length=8, rng=random.Random(42))
-        from OligoDesign.dna import DNA
+        from OligoDesigner.dna import DNA
         assert oligo.right_arm == str(DNA(oligo.left_arm).reverse_complement())
 
     def test_spacer_embedded_in_sequence(self) -> None:
@@ -114,12 +114,12 @@ class TestGenerateInvertedRepeat:
         assert oligo.sequence == expected
 
     def test_right_arm_is_rc_of_left(self) -> None:
-        from OligoDesign.dna import DNA
+        from OligoDesigner.dna import DNA
         oligo = generate_inverted_repeat(outer_arm_length=8, rng=random.Random(10))
         assert oligo.right_arm == str(DNA(oligo.left_arm).reverse_complement())
 
     def test_inner_right_is_rc_of_inner_left(self) -> None:
-        from OligoDesign.dna import DNA
+        from OligoDesigner.dna import DNA
         oligo = generate_inverted_repeat(inner_half_length=6, rng=random.Random(10))
         assert oligo.inner_right == str(DNA(oligo.inner_left).reverse_complement())
 
@@ -441,7 +441,7 @@ class TestStructuredCLI:
 class TestSpacerLengthEnforcement:
     """Generators must reject spacer lengths not in SPACER_LENGTHS = (0,2,3,4,5,6)."""
 
-    from OligoDesign.structured import SPACER_LENGTHS
+    from OligoDesigner.structured import SPACER_LENGTHS
 
     def test_palindromic_motif_spacer_1_raises(self) -> None:
         with pytest.raises(ValueError, match="spacer_length"):

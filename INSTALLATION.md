@@ -10,12 +10,12 @@
 Clone the repository and install it using `pip`:
 
 ```bash
-git clone https://github.com/linsalrob/OligoDesign.git
-cd OligoDesign
+git clone https://github.com/linsalrob/OligoDesigner.git
+cd OligoDesigner
 pip install .
 ```
 
-This installs the `OligoDesign` package and registers two command-line tools:
+This installs the `OligoDesigner` package and registers two command-line tools:
 - `generate-oligos`
 - `generate-structured-oligos`
 
@@ -32,8 +32,8 @@ pip install ".[viz]"
 To install in editable mode (so that changes to the source are reflected immediately without reinstalling):
 
 ```bash
-git clone https://github.com/linsalrob/OligoDesign.git
-cd OligoDesign
+git clone https://github.com/linsalrob/OligoDesigner.git
+cd OligoDesigner
 pip install -e ".[dev]"
 ```
 
