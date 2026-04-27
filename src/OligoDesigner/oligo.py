@@ -421,6 +421,11 @@ def _record_to_oligo(record: dict):
                 inner_left=record["inner_left"],
                 inner_right=record["inner_right"],
                 name=record.get("name", ""),
+                complementary_to=record.get("complementary_to", []),
+                min_stem=record.get("min_stem", 4),
+                min_loop=record.get("min_loop", 3),
+                max_loop=record.get("max_loop", 8),
+                min_hp_run=record.get("min_hp_run", 4),
             )
         except KeyError as exc:
             raise ValueError(

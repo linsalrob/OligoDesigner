@@ -555,3 +555,162 @@ class TestStructuredHairpinNSpacer:
         # 6-base AT arm + 4N spacer + 6-base AT arm -> stem len 6, loop len 4
         # has_hairpin should be True (min_stem=4, loop=4 which is in [3,8])
         assert oligo.has_hairpin is True
+
+
+# ---------------------------------------------------------------------------
+# Analysis options: configurable parameters
+# ---------------------------------------------------------------------------
+
+
+class TestAnalysisParameterFields:
+    """StructuredOligo analysis parameters are configurable via instance fields."""
+
+    def _make_hairpin_oligo(self) -> StructuredOligo:
+        """Return a known-hairpin oligo: AAAA + NNN + TTTT (stem=4, loop=3)."""
+        return StructuredOligo(
+            sequence="AAAANNNTTTT",
+            oligo_type="at_rich_palindrome",
+            left_arm="AAAA",
+            right_arm="TTTT",
+            spacer="NNN",
+            inner_left="",
+            inner_right="",
+        )
+
+    def test_default_min_stem_is_4(self) -> None:
+        oligo = generate_palindromic_motif(rng=random.Random(1))
+        assert oligo.min_stem == 4
+
+    def test_default_min_loop_is_3(self) -> None:
+        oligo = generate_palindromic_motif(rng=random.Random(1))
+        assert oligo.min_loop == 3
+
+    def test_default_max_loop_is_8(self) -> None:
+        oligo = generate_palindromic_motif(rng=random.Random(1))
+        assert oligo.max_loop == 8
+
+    def test_default_min_hp_run_is_4(self) -> None:
+        oligo = generate_palindromic_motif(rng=random.Random(1))
+        assert oligo.min_hp_run == 4
+
+    def test_high_min_stem_disables_hairpin(self) -> None:
+        oligo = self._make_hairpin_oligo()
+        assert oligo.has_hairpin is True  # default min_stem=4
+        oligo.min_stem = 5  # stem is only 4 bases; raising to 5 disables it
+        assert oligo.has_hairpin is False
+
+    def test_high_max_loop_enables_hairpin(self) -> None:
+        # Build an oligo with a large loop that is NOT detected with default max_loop=8
+        # stem5=AAAA, loop=NNNNNNNNN (9 bases), stem3=TTTT
+        oligo = StructuredOligo(
+            sequence="AAAANNNNNNNNNTTTT",
+            oligo_type="at_rich_palindrome",
+            left_arm="AAAA",
+            right_arm="TTTT",
+            spacer="NNNNNNNNN",
+            inner_left="",
+            inner_right="",
+        )
+        assert oligo.has_hairpin is False  # loop=9, above default max_loop=8
+        oligo.max_loop = 9
+        assert oligo.has_hairpin is True
+
+    def test_has_homopolymer_default(self) -> None:
+        # AAAANNNTTTT has a 4-base A run -> has_homopolymer with min_hp_run=4
+        oligo = self._make_hairpin_oligo()
+        assert oligo.has_homopolymer is True
+
+    def test_has_homopolymer_higher_threshold(self) -> None:
+        # Raise min_hp_run to 5: the 4-base A run should no longer be flagged
+        oligo = self._make_hairpin_oligo()
+        oligo.min_hp_run = 5
+        assert oligo.has_homopolymer is False
+
+    def test_complementary_to_default_empty(self) -> None:
+        oligo = generate_palindromic_motif(rng=random.Random(1))
+        assert oligo.complementary_to == []
+
+    def test_complementary_to_in_to_dict(self) -> None:
+        oligo = generate_palindromic_motif(rng=random.Random(1))
+        oligo.complementary_to = ["other1"]
+        d = oligo.to_dict()
+        assert d["complementary_to"] == ["other1"]
+
+    def test_has_homopolymer_in_to_dict(self) -> None:
+        oligo = self._make_hairpin_oligo()
+        d = oligo.to_dict()
+        assert "has_homopolymer" in d
+        assert d["has_homopolymer"] is True
+
+    def test_has_homopolymer_in_tsv_headers(self) -> None:
+        assert "has_homopolymer" in StructuredOligo.tsv_headers()
+
+    def test_complementary_to_in_tsv_headers(self) -> None:
+        assert "complementary_to" in StructuredOligo.tsv_headers()
+
+
+class TestStructuredCLIAnalysisOptions:
+    """Verify that the analysis options are accepted and affect CLI behaviour."""
+
+    def test_min_stem_option_accepted(self) -> None:
+        assert main(["--min-stem", "3", "--quiet", "--seed", "1"]) == 0
+
+    def test_min_loop_option_accepted(self) -> None:
+        assert main(["--min-loop", "4", "--quiet", "--seed", "1"]) == 0
+
+    def test_max_loop_option_accepted(self) -> None:
+        assert main(["--max-loop", "10", "--quiet", "--seed", "1"]) == 0
+
+    def test_min_hp_run_option_accepted(self) -> None:
+        assert main(["--min-hp-run", "3", "--quiet", "--seed", "1"]) == 0
+
+    def test_min_overlap_option_accepted(self) -> None:
+        assert main(["--min-overlap", "8", "--quiet", "--seed", "1"]) == 0
+
+    def test_high_min_stem_reduces_hairpins(self, tmp_path) -> None:
+        path_default = str(tmp_path / "default.json")
+        path_high = str(tmp_path / "high.json")
+
+        main(["--count", "10", "--type", "palindrome", "--seed", "7",
+              "--json", path_default, "--quiet"])
+        main(["--count", "10", "--type", "palindrome", "--seed", "7",
+              "--min-stem", "20", "--json", path_high, "--quiet"])
+
+        default_data = json.loads(open(path_default).read())
+        high_data = json.loads(open(path_high).read())
+
+        default_hairpins = sum(1 for r in default_data if r["has_hairpin"])
+        high_hairpins = sum(1 for r in high_data if r["has_hairpin"])
+        # Requiring a 20-base stem on short oligos should yield fewer hairpins
+        assert high_hairpins <= default_hairpins
+
+    def test_json_includes_has_homopolymer(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main(["--count", "2", "--type", "palindrome", "--seed", "1",
+              "--json", path, "--quiet"])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert "has_homopolymer" in item
+
+    def test_json_includes_complementary_to(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main(["--count", "2", "--type", "palindrome", "--seed", "1",
+              "--json", path, "--quiet"])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert "complementary_to" in item
+
+    def test_tsv_includes_has_homopolymer_column(self, tmp_path) -> None:
+        path = str(tmp_path / "out.tsv")
+        main(["--count", "2", "--type", "palindrome", "--seed", "1",
+              "--tsv", path, "--quiet"])
+        header = open(path).readlines()[0].strip().split("\t")
+        assert "has_homopolymer" in header
+
+    def test_tsv_includes_complementary_to_column(self, tmp_path) -> None:
+        path = str(tmp_path / "out.tsv")
+        main(["--count", "2", "--type", "palindrome", "--seed", "1",
+              "--tsv", path, "--quiet"])
+        header = open(path).readlines()[0].strip().split("\t")
+        assert "complementary_to" in header
+
