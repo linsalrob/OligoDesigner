@@ -421,6 +421,7 @@ def _record_to_oligo(record: dict):
                 inner_left=record["inner_left"],
                 inner_right=record["inner_right"],
                 name=record.get("name", ""),
+                complementary_to=record.get("complementary_to", []),
             )
         except KeyError as exc:
             raise ValueError(
