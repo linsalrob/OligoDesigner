@@ -21,7 +21,8 @@ import argparse
 import random
 import sys
 
-from .oligo import write_fasta, write_json, write_tsv
+from .dna import DNA
+from .oligo import remove_duplicate_sequences, write_fasta, write_json, write_tsv
 from .structured import (
     SPACER_LENGTHS,
     StructuredOligo,
@@ -146,6 +147,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Suppress the default summary printed to stdout.",
     )
+    out.add_argument(
+        "--deduplicate",
+        action="store_true",
+        help=(
+            "Remove oligos with duplicate sequences before output, "
+            "keeping only the first occurrence of each unique sequence."
+        ),
+    )
 
     return parser
 
@@ -251,6 +260,19 @@ def main(argv: list[str] | None = None) -> int:
         batch = _generate_batch(oligo_type, args.count, args, rng, idx, width)
         all_oligos.extend(batch)
         idx += args.count
+
+    # Remove duplicate sequences if requested
+    if args.deduplicate:
+        oligo_dnas = [DNA(o.sequence) for o in all_oligos]
+        oligo_names = [o.name for o in all_oligos]
+        _, unique_names, removed_names = remove_duplicate_sequences(oligo_dnas, oligo_names)
+        unique_name_set = set(unique_names)
+        all_oligos = [o for o in all_oligos if o.name in unique_name_set]
+        if removed_names and not args.quiet:
+            print(
+                f"Removed {len(removed_names)} duplicate sequence(s): "
+                + ", ".join(removed_names)
+            )
 
     # Write outputs using the shared write_* functions from oligo.py
     if args.fasta:

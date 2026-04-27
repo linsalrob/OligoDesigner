@@ -9,6 +9,7 @@ from .oligo import (
     has_tandem_repeat,
     random_oligo,
     read_json,
+    remove_duplicate_sequences,
     write_fasta,
     write_json,
     write_tsv,
@@ -30,6 +31,7 @@ __all__ = [
     "find_complementary_pairs",
     "has_tandem_repeat",
     "random_oligo",
+    "remove_duplicate_sequences",
     # Structured oligo generation
     "StructuredOligo",
     "generate_palindromic_motif",
