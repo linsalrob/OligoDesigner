@@ -288,6 +288,16 @@ def main(argv: list[str] | None = None) -> int:
             f"--spacer-length must be one of {list(SPACER_LENGTHS)}, "
             f"got {args.spacer_length}"
         )
+    if args.min_stem < 1:
+        parser.error("--min-stem must be >= 1")
+    if args.min_loop < 1:
+        parser.error("--min-loop must be >= 1")
+    if args.max_loop < args.min_loop:
+        parser.error("--max-loop must be >= --min-loop")
+    if args.min_hp_run < 1:
+        parser.error("--min-hp-run must be >= 1")
+    if args.min_overlap < 1:
+        parser.error("--min-overlap must be >= 1")
 
     rng = random.Random(args.seed)
 

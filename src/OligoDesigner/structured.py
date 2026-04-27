@@ -213,6 +213,14 @@ class StructuredOligo:
           preserved: ``N`` spacer bases contribute to the loop length
           without collapsing the sequence geometry.
         """
+        if self.min_stem < 1:
+            raise ValueError(f"min_stem must be >= 1, got {self.min_stem}")
+        if self.min_loop < 1:
+            raise ValueError(f"min_loop must be >= 1, got {self.min_loop}")
+        if self.max_loop < self.min_loop:
+            raise ValueError(
+                f"max_loop must be >= min_loop ({self.min_loop}), got {self.max_loop}"
+            )
         seq = self.sequence
         n = len(seq)
         min_stem, min_loop, max_loop = self.min_stem, self.min_loop, self.max_loop
