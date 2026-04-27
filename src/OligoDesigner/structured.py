@@ -294,6 +294,10 @@ class StructuredOligo:
             "has_homopolymer": self.has_homopolymer,
             "has_tandem_repeat": self.has_tandem_repeat,
             "complementary_to": self.complementary_to,
+            "min_stem": self.min_stem,
+            "min_loop": self.min_loop,
+            "max_loop": self.max_loop,
+            "min_hp_run": self.min_hp_run,
         }
 
     def to_tsv_row(self) -> list[str]:
