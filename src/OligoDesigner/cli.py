@@ -24,6 +24,7 @@ from .oligo import (
     analyse_oligo,
     find_complementary_pairs,
     random_oligo,
+    remove_duplicate_sequences,
     write_fasta,
     write_json,
     write_tsv,
@@ -177,6 +178,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Suppress the default summary printed to stdout.",
     )
+    out.add_argument(
+        "--deduplicate",
+        action="store_true",
+        help=(
+            "Remove oligos with duplicate sequences before output, "
+            "keeping only the first occurrence of each unique sequence."
+        ),
+    )
 
     return parser
 
@@ -313,6 +322,15 @@ def main(argv: list[str] | None = None) -> int:
             DNA(five_prime_flank + str(o) + three_prime_flank) for o in oligos
         ]
 
+    # Remove duplicate sequences if requested
+    if args.deduplicate:
+        oligos, names, removed = remove_duplicate_sequences(oligos, names)
+        if removed and not args.quiet:
+            print(
+                f"Removed {len(removed)} duplicate sequence(s): "
+                + ", ".join(removed)
+            )
+
     # Per-oligo analysis (without cross-complementarity)
     analyses: list[OligoAnalysis] = [
         analyse_oligo(
@@ -323,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
             max_loop=args.max_loop,
             min_hp_run=args.min_hp_run,
         )
-        for i in range(args.count)
+        for i in range(len(oligos))
     ]
 
     # Cross-complementarity

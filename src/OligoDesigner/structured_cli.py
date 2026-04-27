@@ -26,7 +26,7 @@ import random
 import sys
 
 from .dna import DNA
-from .oligo import find_complementary_pairs, write_fasta, write_json, write_tsv
+from .oligo import find_complementary_pairs, remove_duplicate_sequences, write_fasta, write_json, write_tsv
 from .structured import (
     SPACER_LENGTHS,
     StructuredOligo,
@@ -230,6 +230,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Suppress the default summary printed to stdout.",
     )
+    out.add_argument(
+        "--deduplicate",
+        action="store_true",
+        help=(
+            "Remove oligos with duplicate sequences before output, "
+            "keeping only the first occurrence of each unique sequence."
+        ),
+    )
 
     return parser
 
@@ -422,6 +430,19 @@ def main(argv: list[str] | None = None) -> int:
     if five_prime_flank or three_prime_flank:
         for oligo in all_oligos:
             oligo.sequence = five_prime_flank + oligo.sequence + three_prime_flank
+
+    # Remove duplicate sequences if requested
+    if args.deduplicate:
+        oligo_dnas = [DNA(o.sequence) for o in all_oligos]
+        oligo_names = [o.name for o in all_oligos]
+        _, unique_names, removed_names = remove_duplicate_sequences(oligo_dnas, oligo_names)
+        unique_name_set = set(unique_names)
+        all_oligos = [o for o in all_oligos if o.name in unique_name_set]
+        if removed_names and not args.quiet:
+            print(
+                f"Removed {len(removed_names)} duplicate sequence(s): "
+                + ", ".join(removed_names)
+            )
 
     # Apply analysis parameters to each oligo
     for oligo in all_oligos:
