@@ -16,6 +16,7 @@ from OligoDesigner.oligo import (
     has_tandem_repeat,
     random_oligo,
     read_json,
+    remove_duplicate_sequences,
     write_fasta,
     write_json,
     write_tsv,
@@ -146,6 +147,65 @@ class TestFindComplementaryPairs:
         pairs = find_complementary_pairs(oligos, names, min_overlap=10)
         assert pairs["a"] == []
         assert pairs["b"] == []
+
+
+# ---------------------------------------------------------------------------
+# remove_duplicate_sequences
+# ---------------------------------------------------------------------------
+
+
+class TestRemoveDuplicateSequences:
+    def test_no_duplicates_unchanged(self) -> None:
+        oligos = [DNA("ACGT"), DNA("TTTT"), DNA("GGGG")]
+        names = ["o1", "o2", "o3"]
+        unique_oligos, unique_names, removed = remove_duplicate_sequences(oligos, names)
+        assert unique_names == ["o1", "o2", "o3"]
+        assert removed == []
+
+    def test_one_duplicate_removed(self) -> None:
+        oligos = [DNA("ACGT"), DNA("TTTT"), DNA("ACGT")]
+        names = ["o1", "o2", "o3"]
+        unique_oligos, unique_names, removed = remove_duplicate_sequences(oligos, names)
+        assert unique_names == ["o1", "o2"]
+        assert removed == ["o3"]
+
+    def test_first_occurrence_kept(self) -> None:
+        oligos = [DNA("ACGT"), DNA("TTTT"), DNA("ACGT")]
+        names = ["first", "other", "second"]
+        unique_oligos, unique_names, removed = remove_duplicate_sequences(oligos, names)
+        assert "first" in unique_names
+        assert "second" not in unique_names
+        assert "second" in removed
+
+    def test_all_duplicates(self) -> None:
+        oligos = [DNA("ACGT")] * 4
+        names = ["o1", "o2", "o3", "o4"]
+        unique_oligos, unique_names, removed = remove_duplicate_sequences(oligos, names)
+        assert unique_names == ["o1"]
+        assert removed == ["o2", "o3", "o4"]
+
+    def test_empty_list(self) -> None:
+        unique_oligos, unique_names, removed = remove_duplicate_sequences([], [])
+        assert unique_oligos == []
+        assert unique_names == []
+        assert removed == []
+
+    def test_returns_correct_dna_objects(self) -> None:
+        oligos = [DNA("ACGT"), DNA("TTTT"), DNA("ACGT")]
+        names = ["o1", "o2", "o3"]
+        unique_oligos, unique_names, removed = remove_duplicate_sequences(oligos, names)
+        assert [str(o) for o in unique_oligos] == ["ACGT", "TTTT"]
+
+    def test_mismatched_lengths_raise(self) -> None:
+        with pytest.raises(ValueError):
+            remove_duplicate_sequences([DNA("ACGT"), DNA("TTTT")], ["o1"])
+
+    def test_multiple_different_duplicates(self) -> None:
+        oligos = [DNA("ACGT"), DNA("TTTT"), DNA("ACGT"), DNA("TTTT"), DNA("GGGG")]
+        names = ["o1", "o2", "o3", "o4", "o5"]
+        _, unique_names, removed = remove_duplicate_sequences(oligos, names)
+        assert unique_names == ["o1", "o2", "o5"]
+        assert removed == ["o3", "o4"]
 
 
 # ---------------------------------------------------------------------------
@@ -426,10 +486,38 @@ class TestCLI:
         data = json.loads(open(path).read())
         assert all(item["name"].startswith("myoligo") for item in data)
 
+    def test_deduplicate_flag_exits_zero(self) -> None:
+        assert main(["--count", "5", "--length", "20", "--quiet", "--seed", "1", "--deduplicate"]) == 0
 
-# ---------------------------------------------------------------------------
-# read_json
-# ---------------------------------------------------------------------------
+    def test_deduplicate_no_duplicates_keeps_all(self, tmp_path) -> None:
+        # With a long length and small count, duplicates are astronomically unlikely
+        path = str(tmp_path / "out.json")
+        main(["--count", "5", "--length", "40", "--json", path, "--quiet", "--seed", "1", "--deduplicate"])
+        data = json.loads(open(path).read())
+        assert len(data) == 5
+
+    def test_deduplicate_removes_duplicates(self, tmp_path, monkeypatch) -> None:
+        # Patch random_oligo to always return the same sequence, forcing duplicates
+        import OligoDesigner.cli as cli_module
+        monkeypatch.setattr(cli_module, "random_oligo", lambda length, rng: DNA("ACGT" * 5))
+        path = str(tmp_path / "out.json")
+        main(["--count", "3", "--length", "20", "--json", path, "--quiet", "--deduplicate"])
+        data = json.loads(open(path).read())
+        assert len(data) == 1
+
+    def test_deduplicate_prints_removed_names(self, capsys, monkeypatch) -> None:
+        import OligoDesigner.cli as cli_module
+        monkeypatch.setattr(cli_module, "random_oligo", lambda length, rng: DNA("ACGT" * 5))
+        main(["--count", "3", "--length", "20", "--deduplicate"])
+        captured = capsys.readouterr()
+        assert "Removed" in captured.out
+
+    def test_deduplicate_quiet_suppresses_removed_message(self, capsys, monkeypatch) -> None:
+        import OligoDesigner.cli as cli_module
+        monkeypatch.setattr(cli_module, "random_oligo", lambda length, rng: DNA("ACGT" * 5))
+        main(["--count", "3", "--length", "20", "--deduplicate", "--quiet"])
+        captured = capsys.readouterr()
+        assert "Removed" not in captured.out
 
 
 class TestReadJson:

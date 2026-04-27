@@ -140,6 +140,68 @@ def has_tandem_repeat(
 
 
 # ---------------------------------------------------------------------------
+# Duplicate-sequence removal
+# ---------------------------------------------------------------------------
+
+
+def remove_duplicate_sequences(
+    oligos: list[DNA],
+    names: list[str],
+) -> tuple[list[DNA], list[str], list[str]]:
+    """Remove oligos whose sequences have already been seen (keep first occurrence).
+
+    Parameters
+    ----------
+    oligos:
+        List of :class:`~OligoDesigner.dna.DNA` objects.
+    names:
+        Names for each oligo, in the same order as *oligos*.
+
+    Returns
+    -------
+    tuple[list[DNA], list[str], list[str]]
+        A 3-tuple ``(unique_oligos, unique_names, removed_names)`` where
+        *unique_oligos* and *unique_names* contain only the first occurrence
+        of each distinct sequence, and *removed_names* lists the names of
+        every entry that was dropped as a duplicate.
+
+    Raises
+    ------
+    ValueError
+        If *oligos* and *names* have different lengths.
+
+    Examples
+    --------
+    >>> from OligoDesigner.dna import DNA
+    >>> oligos = [DNA("ACGT"), DNA("TTTT"), DNA("ACGT")]
+    >>> names = ["o1", "o2", "o3"]
+    >>> unique_oligos, unique_names, removed = remove_duplicate_sequences(oligos, names)
+    >>> unique_names
+    ['o1', 'o2']
+    >>> removed
+    ['o3']
+    """
+    if len(oligos) != len(names):
+        raise ValueError(
+            f"oligos and names must have the same length, "
+            f"got {len(oligos)} oligos and {len(names)} names"
+        )
+    seen: set[str] = set()
+    unique_oligos: list[DNA] = []
+    unique_names: list[str] = []
+    removed_names: list[str] = []
+    for oligo, name in zip(oligos, names):
+        seq = str(oligo)
+        if seq in seen:
+            removed_names.append(name)
+        else:
+            seen.add(seq)
+            unique_oligos.append(oligo)
+            unique_names.append(name)
+    return unique_oligos, unique_names, removed_names
+
+
+# ---------------------------------------------------------------------------
 # Cross-complementarity
 # ---------------------------------------------------------------------------
 
