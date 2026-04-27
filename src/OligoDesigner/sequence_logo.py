@@ -32,10 +32,6 @@ from typing import Union
 
 _BASES = list("ACGT")
 
-# Column order used when stack_order="alphabetical": columns run bottom → top
-# in logomaker's "fixed" mode, so reverse-alphabetical gives A at top.
-_BASES_REV_ALPHA = list("TGCA")
-
 _VALID_LOGO_TYPES = {"counts", "probability", "information"}
 _VALID_STACK_ORDERS = {"value", "alphabetical"}
 
@@ -217,9 +213,9 @@ def sequence_logo(
     fig, ax = plt.subplots(figsize=figsize)
 
     if stack_order == "alphabetical":
-        # Reorder columns to T, G, C, A so that logomaker's "fixed" mode
-        # places T at the bottom and A at the top.
-        logo_df = logo_df[_BASES_REV_ALPHA]
+        # Reorder columns to A, C, G, T so that logomaker's "fixed" mode
+        # (which draws the first column at the top) places A at the top.
+        logo_df = logo_df[_BASES]
         logomaker.Logo(logo_df, ax=ax, color_scheme=color_scheme, stack_order="fixed")
     else:  # value: largest at bottom
         logomaker.Logo(logo_df, ax=ax, color_scheme=color_scheme, stack_order="small_on_top")

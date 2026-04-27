@@ -10,7 +10,7 @@ import pytest
 
 from OligoDesigner.sequence_logo import (
     _build_count_matrix,
-    _BASES_REV_ALPHA,
+    _BASES,
     _VALID_STACK_ORDERS,
     sequence_logo,
 )
@@ -99,9 +99,10 @@ def test_stack_order_alphabetical_produces_png():
         assert os.path.getsize(out) > 0
 
 
-def test_bases_rev_alpha_order():
-    # Confirms that the reverse-alphabetical column list is T, G, C, A.
-    assert _BASES_REV_ALPHA == ["T", "G", "C", "A"]
+def test_bases_alpha_order():
+    # Confirms that the alphabetical column list is A, C, G, T — first column
+    # drawn at the top by logomaker's "fixed" stack order.
+    assert _BASES == ["A", "C", "G", "T"]
 
 
 def test_valid_stack_orders_constant():
