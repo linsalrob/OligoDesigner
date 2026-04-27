@@ -714,3 +714,168 @@ class TestStructuredCLIAnalysisOptions:
         header = open(path).readlines()[0].strip().split("\t")
         assert "complementary_to" in header
 
+
+# ---------------------------------------------------------------------------
+# Structured CLI flank / spacer options
+# ---------------------------------------------------------------------------
+
+
+class TestStructuredCLIFlanks:
+    """Tests for --five-prime-spacer, --three-prime-spacer, and random-length
+    flanking-sequence options on the generate-structured-oligos CLI."""
+
+    def test_five_prime_spacer_prepended(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "3",
+            "--five-prime-spacer", "AAAA",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("AAAA")
+
+    def test_three_prime_spacer_appended(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "3",
+            "--three-prime-spacer", "CCCC",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].endswith("CCCC")
+
+    def test_both_spacers_applied(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "2", "--half-length", "5",
+            "--spacer-length", "0",
+            "--five-prime-spacer", "GGG",
+            "--three-prime-spacer", "TTT",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("GGG")
+            assert item["sequence"].endswith("TTT")
+            # 2*5 core (no inner spacer) + 3 five-prime + 3 three-prime = 16
+            assert item["length"] == 16
+
+    def test_five_prime_random_length(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "3", "--half-length", "5",
+            "--spacer-length", "0",
+            "--five-prime-random-length", "4",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            # 2*5 core + 4 five-prime = 14
+            assert item["length"] == 14
+
+    def test_three_prime_random_length(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "3", "--half-length", "5",
+            "--spacer-length", "0",
+            "--three-prime-random-length", "6",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            # 2*5 core + 6 three-prime = 16
+            assert item["length"] == 16
+
+    def test_random_flanks_are_valid_bases(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "5",
+            "--five-prime-random-length", "4",
+            "--three-prime-random-length", "4",
+            "--json", path, "--quiet", "--seed", "42",
+        ])
+        data = json.loads(open(path).read())
+        valid = set("ACGTN")  # N is allowed inside at_rich palindromes
+        for item in data:
+            assert set(item["sequence"]).issubset(valid)
+
+    def test_random_flanks_reproducible_with_seed(self, tmp_path) -> None:
+        f1 = str(tmp_path / "a.json")
+        f2 = str(tmp_path / "b.json")
+        main(["--type", "palindrome", "--count", "3", "--five-prime-random-length", "5",
+              "--json", f1, "--quiet", "--seed", "99"])
+        main(["--type", "palindrome", "--count", "3", "--five-prime-random-length", "5",
+              "--json", f2, "--quiet", "--seed", "99"])
+        assert open(f1).read() == open(f2).read()
+
+    def test_spacer_lowercase_accepted(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "2",
+            "--five-prime-spacer", "acgt",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("ACGT")
+
+    def test_no_flanks_unchanged(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "2", "--half-length", "5",
+            "--spacer-length", "0",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["length"] == 10
+
+    def test_mutually_exclusive_five_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--type", "palindrome", "--count", "2",
+                "--five-prime-spacer", "AAAA",
+                "--five-prime-random-length", "4",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_mutually_exclusive_three_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--type", "palindrome", "--count", "2",
+                "--three-prime-spacer", "TTTT",
+                "--three-prime-random-length", "4",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_invalid_bases_five_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--type", "palindrome", "--count", "2",
+                "--five-prime-spacer", "AAAXTT",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_invalid_bases_three_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--type", "palindrome", "--count", "2",
+                "--three-prime-spacer", "NNNN",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_random_length_zero_exits_nonzero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--type", "palindrome", "--count", "2",
+                "--five-prime-random-length", "0",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+

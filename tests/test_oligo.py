@@ -428,6 +428,163 @@ class TestCLI:
 
 
 # ---------------------------------------------------------------------------
+# CLI flank / spacer options
+# ---------------------------------------------------------------------------
+
+
+class TestCLIFlanks:
+    """Tests for --five-prime-spacer, --three-prime-spacer, and random-length
+    flanking-sequence options on the generate-oligos CLI."""
+
+    def test_five_prime_spacer_prepended(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--five-prime-spacer", "AAAA",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("AAAA")
+            assert item["length"] == 14
+
+    def test_three_prime_spacer_appended(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--three-prime-spacer", "TTTT",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].endswith("TTTT")
+            assert item["length"] == 14
+
+    def test_both_spacers_applied(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "2", "--length", "10",
+            "--five-prime-spacer", "GGG",
+            "--three-prime-spacer", "CCC",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("GGG")
+            assert item["sequence"].endswith("CCC")
+            assert item["length"] == 16
+
+    def test_five_prime_random_length(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--five-prime-random-length", "5",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["length"] == 15
+
+    def test_three_prime_random_length(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--three-prime-random-length", "6",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["length"] == 16
+
+    def test_random_flanks_are_valid_bases(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "5", "--length", "10",
+            "--five-prime-random-length", "4",
+            "--three-prime-random-length", "4",
+            "--json", path, "--quiet", "--seed", "42",
+        ])
+        data = json.loads(open(path).read())
+        valid = set("ACGT")
+        for item in data:
+            assert set(item["sequence"]).issubset(valid)
+
+    def test_random_flanks_reproducible_with_seed(self, tmp_path) -> None:
+        f1 = str(tmp_path / "a.json")
+        f2 = str(tmp_path / "b.json")
+        main(["--count", "3", "--length", "10", "--five-prime-random-length", "5",
+              "--json", f1, "--quiet", "--seed", "99"])
+        main(["--count", "3", "--length", "10", "--five-prime-random-length", "5",
+              "--json", f2, "--quiet", "--seed", "99"])
+        assert open(f1).read() == open(f2).read()
+
+    def test_spacer_lowercase_accepted(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "2", "--length", "10",
+            "--five-prime-spacer", "acgt",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("ACGT")
+
+    def test_no_flanks_unchanged(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main(["--count", "3", "--length", "10", "--json", path, "--quiet", "--seed", "1"])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["length"] == 10
+
+    def test_mutually_exclusive_five_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-spacer", "AAAA",
+                "--five-prime-random-length", "4",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_mutually_exclusive_three_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--three-prime-spacer", "TTTT",
+                "--three-prime-random-length", "4",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_invalid_bases_five_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-spacer", "AAAXTT",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_invalid_bases_three_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--three-prime-spacer", "NNNN",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_random_length_zero_exits_nonzero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-random-length", "0",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+
+# ---------------------------------------------------------------------------
 # read_json
 # ---------------------------------------------------------------------------
 

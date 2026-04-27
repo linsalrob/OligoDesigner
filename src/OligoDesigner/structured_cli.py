@@ -8,6 +8,8 @@ Usage
                                [--count N] [--half-length L]
                                [--outer-arm-length L] [--inner-half-length L]
                                [--spacer-length S]
+                               [--five-prime-spacer SEQ] [--three-prime-spacer SEQ]
+                               [--five-prime-random-length N] [--three-prime-random-length N]
                                [--seed S] [--prefix PREFIX]
                                [--min-stem N] [--min-loop N] [--max-loop N]
                                [--min-hp-run N] [--min-overlap N]
@@ -120,6 +122,47 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Name prefix for generated oligos (default: 'soligo').",
     )
 
+    # Flank / spacer options
+    flank = parser.add_argument_group("flanks")
+    flank.add_argument(
+        "--five-prime-spacer",
+        metavar="SEQ",
+        default=None,
+        help=(
+            "ACGT sequence to prepend as a 5' flank to every oligo.  "
+            "Mutually exclusive with --five-prime-random-length."
+        ),
+    )
+    flank.add_argument(
+        "--three-prime-spacer",
+        metavar="SEQ",
+        default=None,
+        help=(
+            "ACGT sequence to append as a 3' flank to every oligo.  "
+            "Mutually exclusive with --three-prime-random-length."
+        ),
+    )
+    flank.add_argument(
+        "--five-prime-random-length",
+        type=int,
+        metavar="N",
+        default=None,
+        help=(
+            "Generate a random ACGT sequence of length N as the 5' flank.  "
+            "Mutually exclusive with --five-prime-spacer."
+        ),
+    )
+    flank.add_argument(
+        "--three-prime-random-length",
+        type=int,
+        metavar="N",
+        default=None,
+        help=(
+            "Generate a random ACGT sequence of length N as the 3' flank.  "
+            "Mutually exclusive with --three-prime-spacer."
+        ),
+    )
+
     # Analysis options
     ana = parser.add_argument_group("analysis")
     ana.add_argument(
@@ -189,6 +232,42 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _resolve_flanks(args: argparse.Namespace, rng: random.Random) -> tuple[str, str]:
+    """Return ``(five_prime_flank, three_prime_flank)`` strings from CLI args.
+
+    Generates random ACGT sequences when the ``*_random_length`` arguments are
+    provided; uses the literal user-supplied strings otherwise.  Returns empty
+    strings when no flank option was given for that end.
+
+    Parameters
+    ----------
+    args:
+        Parsed argument namespace.
+    rng:
+        Random instance used when generating random flanks.
+
+    Returns
+    -------
+    tuple[str, str]
+        ``(five_prime_flank, three_prime_flank)`` – may be empty strings.
+    """
+    five_prime = ""
+    three_prime = ""
+    if args.five_prime_spacer is not None:
+        five_prime = args.five_prime_spacer.upper()
+    elif args.five_prime_random_length is not None:
+        five_prime = "".join(
+            rng.choice("ACGT") for _ in range(args.five_prime_random_length)
+        )
+    if args.three_prime_spacer is not None:
+        three_prime = args.three_prime_spacer.upper()
+    elif args.three_prime_random_length is not None:
+        three_prime = "".join(
+            rng.choice("ACGT") for _ in range(args.three_prime_random_length)
+        )
+    return five_prime, three_prime
 
 
 def _print_summary(oligos: list[StructuredOligo]) -> None:
@@ -299,7 +378,32 @@ def main(argv: list[str] | None = None) -> int:
     if args.min_overlap < 1:
         parser.error("--min-overlap must be >= 1")
 
+    # Flank validation
+    if args.five_prime_spacer is not None and args.five_prime_random_length is not None:
+        parser.error(
+            "--five-prime-spacer and --five-prime-random-length are mutually exclusive"
+        )
+    if args.three_prime_spacer is not None and args.three_prime_random_length is not None:
+        parser.error(
+            "--three-prime-spacer and --three-prime-random-length are mutually exclusive"
+        )
+    if args.five_prime_spacer is not None and not set(
+        args.five_prime_spacer.upper()
+    ).issubset(set("ACGT")):
+        parser.error("--five-prime-spacer must contain only A, C, G, T bases")
+    if args.three_prime_spacer is not None and not set(
+        args.three_prime_spacer.upper()
+    ).issubset(set("ACGT")):
+        parser.error("--three-prime-spacer must contain only A, C, G, T bases")
+    if args.five_prime_random_length is not None and args.five_prime_random_length < 1:
+        parser.error("--five-prime-random-length must be >= 1")
+    if args.three_prime_random_length is not None and args.three_prime_random_length < 1:
+        parser.error("--three-prime-random-length must be >= 1")
+
     rng = random.Random(args.seed)
+
+    # Resolve flanks (before oligo generation to keep RNG state consistent)
+    five_prime_flank, three_prime_flank = _resolve_flanks(args, rng)
 
     # Determine which types to generate
     types_to_generate = _ALL_TYPES if args.type == "all" else [args.type]
@@ -313,6 +417,11 @@ def main(argv: list[str] | None = None) -> int:
         batch = _generate_batch(oligo_type, args.count, args, rng, idx, width)
         all_oligos.extend(batch)
         idx += args.count
+
+    # Apply flanks if specified
+    if five_prime_flank or three_prime_flank:
+        for oligo in all_oligos:
+            oligo.sequence = five_prime_flank + oligo.sequence + three_prime_flank
 
     # Apply analysis parameters to each oligo
     for oligo in all_oligos:
