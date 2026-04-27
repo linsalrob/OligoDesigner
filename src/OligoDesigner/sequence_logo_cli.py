@@ -126,6 +126,18 @@ def _build_parser() -> argparse.ArgumentParser:
     # ---- Logo style options ------------------------------------------------
     logo = parser.add_argument_group("logo")
     logo.add_argument(
+        "--stack-order",
+        choices=["value", "alphabetical"],
+        default="value",
+        metavar="ORDER",
+        dest="stack_order",
+        help=(
+            "Stacking order of bases at each position: "
+            "'value' places the largest value at the bottom (default), "
+            "'alphabetical' keeps bases in A–T order from the top."
+        ),
+    )
+    logo.add_argument(
         "--logo-type",
         choices=["counts", "probability", "information"],
         default="counts",
@@ -249,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
             figsize=(args.width, args.height),
             color_scheme=args.color_scheme,
             dpi=args.dpi,
+            stack_order=args.stack_order,
         )
     except (ImportError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)

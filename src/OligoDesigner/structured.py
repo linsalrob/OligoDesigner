@@ -49,7 +49,7 @@ Usage
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from .dna import DNA, _COMPLEMENT_TABLE
@@ -118,6 +118,18 @@ class StructuredOligo:
         types.
     name:
         Optional identifier string.
+    complementary_to:
+        Names of other oligos in the set that are cross-complementary
+        (populated by the CLI after cross-complementarity analysis).
+    min_stem:
+        Minimum stem length used for hairpin detection (default: 4).
+    min_loop:
+        Minimum loop length used for hairpin detection (default: 3).
+    max_loop:
+        Maximum loop length used for hairpin detection (default: 8).
+    min_hp_run:
+        Minimum homopolymer run length used for homopolymer detection
+        (default: 4).
     """
 
     sequence: str
@@ -128,6 +140,11 @@ class StructuredOligo:
     inner_left: str
     inner_right: str
     name: str = ""
+    complementary_to: list = field(default_factory=list)
+    min_stem: int = 4
+    min_loop: int = 3
+    max_loop: int = 8
+    min_hp_run: int = 4
 
     # ------------------------------------------------------------------
     # Computed properties
@@ -183,7 +200,8 @@ class StructuredOligo:
         so it is not reported as a hairpin.  ``N`` bases are freely allowed
         in loop positions.
 
-        Default parameters: ``min_stem=4``, ``min_loop=3``, ``max_loop=8``.
+        Uses the instance's ``min_stem``, ``min_loop``, and ``max_loop``
+        attributes (defaults: 4, 3, 8).
 
         Notes on ambiguity handling
         ---------------------------
@@ -195,9 +213,17 @@ class StructuredOligo:
           preserved: ``N`` spacer bases contribute to the loop length
           without collapsing the sequence geometry.
         """
+        if self.min_stem < 1:
+            raise ValueError(f"min_stem must be >= 1, got {self.min_stem}")
+        if self.min_loop < 1:
+            raise ValueError(f"min_loop must be >= 1, got {self.min_loop}")
+        if self.max_loop < self.min_loop:
+            raise ValueError(
+                f"max_loop must be >= min_loop ({self.min_loop}), got {self.max_loop}"
+            )
         seq = self.sequence
         n = len(seq)
-        min_stem, min_loop, max_loop = 4, 3, 8
+        min_stem, min_loop, max_loop = self.min_stem, self.min_loop, self.max_loop
         for stem_len in range(min_stem, n // 2 + 1):
             for loop_len in range(min_loop, max_loop + 1):
                 required = 2 * stem_len + loop_len
@@ -225,6 +251,19 @@ class StructuredOligo:
         if not acgt_only:
             return False
         return _htr(DNA(acgt_only))
+
+    @property
+    def has_homopolymer(self) -> bool:
+        """``True`` if the ACGT-only portion contains a homopolymer run of at
+        least ``self.min_hp_run`` consecutive identical bases.
+
+        ``N`` spacer bases are excluded before checking, since they are
+        positional placeholders and not real nucleotides.
+        """
+        acgt_only = "".join(b for b in self.sequence if b in _ALL_BASES)
+        if not acgt_only:
+            return False
+        return DNA(acgt_only).has_homopolymer(min_length=self.min_hp_run)
 
     @property
     def tm(self) -> float | None:
@@ -260,7 +299,13 @@ class StructuredOligo:
             "entropy": self.entropy,
             "tm": self.tm,
             "has_hairpin": self.has_hairpin,
+            "has_homopolymer": self.has_homopolymer,
             "has_tandem_repeat": self.has_tandem_repeat,
+            "complementary_to": self.complementary_to,
+            "min_stem": self.min_stem,
+            "min_loop": self.min_loop,
+            "max_loop": self.max_loop,
+            "min_hp_run": self.min_hp_run,
         }
 
     def to_tsv_row(self) -> list[str]:
@@ -281,7 +326,9 @@ class StructuredOligo:
             f"{self.entropy:.4f}",
             f"{self.tm:.2f}" if self.tm is not None else "",
             str(self.has_hairpin),
+            str(self.has_homopolymer),
             str(self.has_tandem_repeat),
+            ",".join(self.complementary_to),
         ]
 
     @staticmethod
@@ -303,7 +350,9 @@ class StructuredOligo:
             "entropy",
             "tm",
             "has_hairpin",
+            "has_homopolymer",
             "has_tandem_repeat",
+            "complementary_to",
         ]
 
 

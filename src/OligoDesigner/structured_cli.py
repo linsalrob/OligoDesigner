@@ -9,6 +9,8 @@ Usage
                                [--outer-arm-length L] [--inner-half-length L]
                                [--spacer-length S]
                                [--seed S] [--prefix PREFIX]
+                               [--min-stem N] [--min-loop N] [--max-loop N]
+                               [--min-hp-run N] [--min-overlap N]
                                [--fasta FILE] [--json FILE] [--tsv FILE]
                                [--quiet]
 
@@ -22,7 +24,7 @@ import random
 import sys
 
 from .dna import DNA
-from .oligo import remove_duplicate_sequences, write_fasta, write_json, write_tsv
+from .oligo import find_complementary_pairs, remove_duplicate_sequences, write_fasta, write_json, write_tsv
 from .structured import (
     SPACER_LENGTHS,
     StructuredOligo,
@@ -118,6 +120,44 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Name prefix for generated oligos (default: 'soligo').",
     )
 
+    # Analysis options
+    ana = parser.add_argument_group("analysis")
+    ana.add_argument(
+        "--min-stem",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Minimum stem length for hairpin detection (default: 4).",
+    )
+    ana.add_argument(
+        "--min-loop",
+        type=int,
+        default=3,
+        metavar="N",
+        help="Minimum loop length for hairpin detection (default: 3).",
+    )
+    ana.add_argument(
+        "--max-loop",
+        type=int,
+        default=8,
+        metavar="N",
+        help="Maximum loop length for hairpin detection (default: 8).",
+    )
+    ana.add_argument(
+        "--min-hp-run",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Minimum homopolymer run length to flag (default: 4).",
+    )
+    ana.add_argument(
+        "--min-overlap",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Minimum overlap for cross-complementarity detection (default: 10).",
+    )
+
     # Output options
     out = parser.add_argument_group("output")
     out.add_argument(
@@ -161,19 +201,30 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _print_summary(oligos: list[StructuredOligo]) -> None:
     """Print a human-readable summary table to stdout."""
+    flagged = [o for o in oligos if (
+        o.has_homopolymer
+        or o.has_hairpin
+        or o.has_tandem_repeat
+        or o.complementary_to
+    )]
+
     header = (
         f"{'Name':<20} {'Length':>6} {'Type':<20} {'GC%':>6} {'Entropy':>8}  "
-        f"{'Palind':>6} {'Hairpin':>7}"
+        f"{'Palind':>6} {'Hairpin':>7} {'Homopol':>7} {'TandRep':>7} {'XCompl':>6}"
     )
-    print(f"Generated {len(oligos)} structured oligos\n")
+    print(f"Generated {len(oligos)} structured oligos ({len(flagged)} flagged)\n")
     print(header)
     print("-" * len(header))
     for oligo in oligos:
+        xcompl = "yes" if oligo.complementary_to else "no"
         print(
             f"{oligo.name:<20} {oligo.length:>6} {oligo.oligo_type:<20} "
             f"{oligo.gc_content * 100:>5.1f}% {oligo.entropy:>8.4f}  "
             f"{'yes' if oligo.is_palindrome else 'no':>6} "
-            f"{'yes' if oligo.has_hairpin else 'no':>7}"
+            f"{'yes' if oligo.has_hairpin else 'no':>7} "
+            f"{'yes' if oligo.has_homopolymer else 'no':>7} "
+            f"{'yes' if oligo.has_tandem_repeat else 'no':>7} "
+            f"{xcompl:>6}"
         )
 
 
@@ -245,6 +296,16 @@ def main(argv: list[str] | None = None) -> int:
             f"--spacer-length must be one of {list(SPACER_LENGTHS)}, "
             f"got {args.spacer_length}"
         )
+    if args.min_stem < 1:
+        parser.error("--min-stem must be >= 1")
+    if args.min_loop < 1:
+        parser.error("--min-loop must be >= 1")
+    if args.max_loop < args.min_loop:
+        parser.error("--max-loop must be >= --min-loop")
+    if args.min_hp_run < 1:
+        parser.error("--min-hp-run must be >= 1")
+    if args.min_overlap < 1:
+        parser.error("--min-overlap must be >= 1")
 
     rng = random.Random(args.seed)
 
@@ -273,6 +334,20 @@ def main(argv: list[str] | None = None) -> int:
                 f"Removed {len(removed_names)} duplicate sequence(s): "
                 + ", ".join(removed_names)
             )
+
+    # Apply analysis parameters to each oligo
+    for oligo in all_oligos:
+        oligo.min_stem = args.min_stem
+        oligo.min_loop = args.min_loop
+        oligo.max_loop = args.max_loop
+        oligo.min_hp_run = args.min_hp_run
+
+    # Cross-complementarity (ACGT-only sequences used for matching)
+    dna_seqs = [DNA("".join(b for b in o.sequence if b in "ACGT")) for o in all_oligos]
+    names = [o.name for o in all_oligos]
+    pairs = find_complementary_pairs(dna_seqs, names, min_overlap=args.min_overlap)
+    for oligo in all_oligos:
+        oligo.complementary_to = pairs.get(oligo.name, [])
 
     # Write outputs using the shared write_* functions from oligo.py
     if args.fasta:
