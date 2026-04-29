@@ -113,6 +113,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "Mutually exclusive with --three-prime-spacer."
         ),
     )
+    flank.add_argument(
+        "--same-random-oligo",
+        action="store_true",
+        default=False,
+        help=(
+            "When --five-prime-random-length or --three-prime-random-length is set, "
+            "generate one random flank sequence and apply it to every oligo instead "
+            "of generating a unique random flank per oligo.  "
+            "Implies --deduplicate, because the shared flank limits sequence diversity.  "
+            "Requires at least one --*-random-length option."
+        ),
+    )
 
     # Analysis options
     ana = parser.add_argument_group("analysis")
@@ -190,40 +202,50 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_flanks(args: argparse.Namespace, rng: random.Random) -> tuple[str, str]:
-    """Return ``(five_prime_flank, three_prime_flank)`` strings from CLI args.
+def _make_flank_generators(args: argparse.Namespace, rng: random.Random):
+    """Return ``(five_prime_fn, three_prime_fn)`` callables for per-oligo flank generation.
 
-    Generates random ACGT sequences when the ``*_random_length`` arguments are
-    provided; uses the literal user-supplied strings otherwise.  Returns empty
-    strings when no flank option was given for that end.
+    Each callable takes no arguments and returns a flank string for one oligo:
+
+    * Fixed spacers (``--five-prime-spacer`` / ``--three-prime-spacer``) always
+      return the same upper-cased string.
+    * Random-length flanks (``--five-prime-random-length`` /
+      ``--three-prime-random-length``) return a **new** random ACGT sequence on
+      each call **unless** ``--same-random-oligo`` is set, in which case a single
+      sequence is generated once and reused for every oligo.
+    * When no option is given for an end the callable returns ``""``.
 
     Parameters
     ----------
     args:
         Parsed argument namespace.
     rng:
-        Random instance used when generating random flanks.
-
-    Returns
-    -------
-    tuple[str, str]
-        ``(five_prime_flank, three_prime_flank)`` – may be empty strings.
+        Shared :class:`random.Random` instance used for all random draws.
     """
-    five_prime = ""
-    three_prime = ""
-    if args.five_prime_spacer is not None:
-        five_prime = args.five_prime_spacer.upper()
-    elif args.five_prime_random_length is not None:
-        five_prime = "".join(
-            rng.choice("ACGT") for _ in range(args.five_prime_random_length)
-        )
-    if args.three_prime_spacer is not None:
-        three_prime = args.three_prime_spacer.upper()
-    elif args.three_prime_random_length is not None:
-        three_prime = "".join(
-            rng.choice("ACGT") for _ in range(args.three_prime_random_length)
-        )
-    return five_prime, three_prime
+
+    def _end_gen(fixed: str | None, random_length: int | None):
+        if fixed is not None:
+            val = fixed.upper()
+            return lambda: val
+        if random_length is not None:
+            if args.same_random_oligo:
+                val = "".join(rng.choice("ACGT") for _ in range(random_length))
+                return lambda: val
+            n = random_length
+            return lambda: "".join(rng.choice("ACGT") for _ in range(n))
+        return lambda: ""
+
+    return (
+        _end_gen(args.five_prime_spacer, args.five_prime_random_length),
+        _end_gen(args.three_prime_spacer, args.three_prime_random_length),
+    )
+
+
+# Keep a thin alias for backwards-compatibility with any external callers.
+def _resolve_flanks(args: argparse.Namespace, rng: random.Random) -> tuple[str, str]:
+    """Deprecated – use :func:`_make_flank_generators` instead."""
+    five_fn, three_fn = _make_flank_generators(args, rng)
+    return five_fn(), three_fn()
 
 
 def _print_summary(analyses: list[OligoAnalysis]) -> None:
@@ -301,26 +323,38 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--five-prime-random-length must be >= 1")
     if args.three_prime_random_length is not None and args.three_prime_random_length < 1:
         parser.error("--three-prime-random-length must be >= 1")
+    if args.same_random_oligo and (
+        args.five_prime_random_length is None and args.three_prime_random_length is None
+    ):
+        parser.error(
+            "--same-random-oligo requires at least one of "
+            "--five-prime-random-length or --three-prime-random-length"
+        )
 
     rng = random.Random(args.seed)
 
-    # Resolve flanks (must be done before oligo generation to keep RNG state consistent)
-    five_prime_flank, three_prime_flank = _resolve_flanks(args, rng)
+    # Build per-oligo flank generators.  With --same-random-oligo the random
+    # sequences are generated once (before the main loop) and reused; without
+    # the flag each call produces a fresh random sequence.
+    five_prime_gen, three_prime_gen = _make_flank_generators(args, rng)
 
-    # Generate oligos
+    # Generate oligos and apply flanks per-oligo
     width = len(str(args.count))
     names: list[str] = []
     oligos: list[DNA] = []
     for i in range(1, args.count + 1):
         name = f"{args.prefix}{i:0{width}}"
         names.append(name)
-        oligos.append(random_oligo(length=args.length, rng=rng))
+        oligo = random_oligo(length=args.length, rng=rng)
+        five = five_prime_gen()
+        three = three_prime_gen()
+        if five or three:
+            oligo = DNA(five + str(oligo) + three)
+        oligos.append(oligo)
 
-    # Apply flanks if specified
-    if five_prime_flank or three_prime_flank:
-        oligos = [
-            DNA(five_prime_flank + str(o) + three_prime_flank) for o in oligos
-        ]
+    # --same-random-oligo limits diversity, so automatically deduplicate
+    if args.same_random_oligo:
+        args.deduplicate = True
 
     # Remove duplicate sequences if requested
     if args.deduplicate:

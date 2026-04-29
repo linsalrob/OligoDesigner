@@ -676,6 +676,79 @@ class TestCLIFlanks:
         captured = capsys.readouterr()
         assert "Removed" not in captured.out
 
+    # --same-random-oligo tests
+
+    def test_same_random_oligo_all_flanks_equal(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "5", "--length", "10",
+            "--five-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        prefixes = [item["sequence"][:4] for item in data]
+        assert len(set(prefixes)) == 1, "all oligos should share the same 5' random flank"
+
+    def test_same_random_oligo_three_prime_all_equal(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "5", "--length", "10",
+            "--three-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        suffixes = [item["sequence"][-4:] for item in data]
+        assert len(set(suffixes)) == 1, "all oligos should share the same 3' random flank"
+
+    def test_without_same_random_oligo_flanks_differ(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "10", "--length", "10",
+            "--five-prime-random-length", "6",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        prefixes = [item["sequence"][:6] for item in data]
+        # With 10 oligos and length-6 flanks it would be astronomically unlikely
+        # for all prefixes to collide — expect at least 2 distinct values.
+        assert len(set(prefixes)) > 1, "each oligo should get a unique random 5' flank"
+
+    def test_same_random_oligo_implies_deduplicate(self, tmp_path, monkeypatch) -> None:
+        # Force every oligo core to be the same; with --same-random-oligo the
+        # shared flank means all final sequences are identical → dedup leaves 1.
+        import OligoDesigner.cli as cli_module
+        monkeypatch.setattr(cli_module, "random_oligo", lambda length, rng: DNA("ACGT" * 5))
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "20",
+            "--five-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        assert len(data) == 1
+
+    def test_same_random_oligo_requires_random_length(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-spacer", "AAAA",
+                "--same-random-oligo",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_same_random_oligo_reproducible_with_seed(self, tmp_path) -> None:
+        f1 = str(tmp_path / "a.json")
+        f2 = str(tmp_path / "b.json")
+        main(["--count", "4", "--length", "10", "--five-prime-random-length", "5",
+              "--same-random-oligo", "--json", f1, "--quiet", "--seed", "7"])
+        main(["--count", "4", "--length", "10", "--five-prime-random-length", "5",
+              "--same-random-oligo", "--json", f2, "--quiet", "--seed", "7"])
+        assert open(f1).read() == open(f2).read()
+
 
 # ---------------------------------------------------------------------------
 # read_json

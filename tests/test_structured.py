@@ -879,3 +879,82 @@ class TestStructuredCLIFlanks:
             ])
         assert exc.value.code != 0
 
+    # --same-random-oligo tests
+
+    def test_same_random_oligo_all_flanks_equal(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "5",
+            "--five-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        prefixes = [item["sequence"][:4] for item in data]
+        assert len(set(prefixes)) == 1, "all oligos should share the same 5' random flank"
+
+    def test_same_random_oligo_three_prime_all_equal(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "5",
+            "--three-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        suffixes = [item["sequence"][-4:] for item in data]
+        assert len(set(suffixes)) == 1, "all oligos should share the same 3' random flank"
+
+    def test_without_same_random_oligo_flanks_differ(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "10",
+            "--five-prime-random-length", "6",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        prefixes = [item["sequence"][:6] for item in data]
+        assert len(set(prefixes)) > 1, "each oligo should get a unique random 5' flank"
+
+    def test_same_random_oligo_implies_deduplicate(self, tmp_path, monkeypatch) -> None:
+        # Patch the generator in structured_cli's namespace (it was imported by name)
+        # so all cores are identical; the shared flank makes every final sequence a duplicate.
+        import OligoDesigner.structured_cli as cli_module
+        from OligoDesigner import structured as structured_module
+        fixed_oligo = structured_module.generate_palindromic_motif(
+            half_length=6, rng=random.Random(1)
+        )
+
+        def _fixed_palindrome(**kwargs):
+            import copy
+            return copy.deepcopy(fixed_oligo)
+
+        monkeypatch.setattr(cli_module, "generate_palindromic_motif", _fixed_palindrome)
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "3",
+            "--five-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        assert len(data) == 1
+
+    def test_same_random_oligo_requires_random_length(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--type", "palindrome", "--count", "2",
+                "--five-prime-spacer", "AAAA",
+                "--same-random-oligo",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_same_random_oligo_reproducible_with_seed(self, tmp_path) -> None:
+        f1 = str(tmp_path / "a.json")
+        f2 = str(tmp_path / "b.json")
+        main(["--type", "palindrome", "--count", "4", "--five-prime-random-length", "5",
+              "--same-random-oligo", "--json", f1, "--quiet", "--seed", "7"])
+        main(["--type", "palindrome", "--count", "4", "--five-prime-random-length", "5",
+              "--same-random-oligo", "--json", f2, "--quiet", "--seed", "7"])
+        assert open(f1).read() == open(f2).read()
