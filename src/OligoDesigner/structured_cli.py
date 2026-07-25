@@ -252,15 +252,17 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _make_flank_generators(args: argparse.Namespace, rng: random.Random):
+def _make_flank_generators(
+    args: argparse.Namespace, rng: random.Random, count: int = 1
+):
     """Return ``(five_prime_fn, three_prime_fn)`` callables for per-oligo flank generation.
 
     Each callable takes no arguments and returns a flank string for one oligo:
 
     * Fixed spacers always return the same upper-cased string.
-    * Random-length flanks return a **new** random ACGT sequence on each call
-      unless ``--same-random-oligo`` is set, in which case a single sequence is
-      generated once and reused for every oligo.
+    * Random-length flanks return a unique random ACGT sequence on each call,
+      retrying collisions, unless ``--same-random-oligo`` is set, in which case
+      a single sequence is generated once and reused for every oligo.
     * When no option is given for an end the callable returns ``""``.
     """
 
@@ -272,8 +274,22 @@ def _make_flank_generators(args: argparse.Namespace, rng: random.Random):
             if args.same_random_oligo:
                 val = "".join(rng.choice("ACGT") for _ in range(random_length))
                 return lambda: val
+            if count > 4**random_length:
+                raise ValueError(
+                    f"cannot generate {count} unique random flanks of length "
+                    f"{random_length}; at most {4**random_length} are available"
+                )
             n = random_length
-            return lambda: "".join(rng.choice("ACGT") for _ in range(n))
+            seen: set[str] = set()
+
+            def unique_random_flank() -> str:
+                while True:
+                    value = "".join(rng.choice("ACGT") for _ in range(n))
+                    if value not in seen:
+                        seen.add(value)
+                        return value
+
+            return unique_random_flank
         return lambda: ""
 
     return (
@@ -426,18 +442,21 @@ def main(argv: list[str] | None = None) -> int:
             "--five-prime-random-length or --three-prime-random-length"
         )
 
-    rng = random.Random(args.seed)
-
-    # Build per-oligo flank generators.  With --same-random-oligo the random
-    # sequences are generated once (before the main loop) and reused; without
-    # the flag each call produces a fresh random sequence.
-    five_prime_gen, three_prime_gen = _make_flank_generators(args, rng)
-
     # Determine which types to generate
     types_to_generate = _ALL_TYPES if args.type == "all" else [args.type]
 
     total = args.count * len(types_to_generate)
     width = len(str(total))
+
+    rng = random.Random(args.seed)
+
+    # Build per-oligo flank generators.  With --same-random-oligo the random
+    # sequences are generated once (before the main loop) and reused; without
+    # the flag each call produces a fresh, collision-free random sequence.
+    try:
+        five_prime_gen, three_prime_gen = _make_flank_generators(args, rng, total)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     all_oligos: list[StructuredOligo] = []
     idx = 1

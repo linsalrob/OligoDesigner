@@ -916,6 +916,24 @@ class TestStructuredCLIFlanks:
         prefixes = [item["sequence"][:6] for item in data]
         assert len(set(prefixes)) > 1, "each oligo should get a unique random 5' flank"
 
+    def test_random_flanks_are_all_unique(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "4",
+            "--five-prime-random-length", "1",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        prefixes = [item["sequence"][:1] for item in json.loads(open(path).read())]
+        assert len(set(prefixes)) == 4
+
+    def test_unique_random_flank_capacity_uses_total_count(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--type", "all", "--count", "2",
+                "--five-prime-random-length", "1", "--quiet",
+            ])
+        assert exc.value.code != 0
+
     def test_same_random_oligo_implies_deduplicate(self, tmp_path, monkeypatch) -> None:
         # Patch the generator in structured_cli's namespace (it was imported by name)
         # so all cores are identical; the shared flank makes every final sequence a duplicate.

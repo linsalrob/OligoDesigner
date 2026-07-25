@@ -715,6 +715,24 @@ class TestCLIFlanks:
         # for all prefixes to collide — expect at least 2 distinct values.
         assert len(set(prefixes)) > 1, "each oligo should get a unique random 5' flank"
 
+    def test_random_flanks_are_all_unique(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "4", "--length", "10",
+            "--five-prime-random-length", "1",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        prefixes = [item["sequence"][:1] for item in json.loads(open(path).read())]
+        assert len(set(prefixes)) == 4
+
+    def test_unique_random_flank_capacity_is_validated(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "5", "--length", "10",
+                "--five-prime-random-length", "1", "--quiet",
+            ])
+        assert exc.value.code != 0
+
     def test_same_random_oligo_implies_deduplicate(self, tmp_path, monkeypatch) -> None:
         # Force every oligo core to be the same; with --same-random-oligo the
         # shared flank means all final sequences are identical → dedup leaves 1.

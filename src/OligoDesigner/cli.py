@@ -202,7 +202,9 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _make_flank_generators(args: argparse.Namespace, rng: random.Random):
+def _make_flank_generators(
+    args: argparse.Namespace, rng: random.Random, count: int = 1
+):
     """Return ``(five_prime_fn, three_prime_fn)`` callables for per-oligo flank generation.
 
     Each callable takes no arguments and returns a flank string for one oligo:
@@ -211,8 +213,9 @@ def _make_flank_generators(args: argparse.Namespace, rng: random.Random):
       return the same upper-cased string.
     * Random-length flanks (``--five-prime-random-length`` /
       ``--three-prime-random-length``) return a **new** random ACGT sequence on
-      each call **unless** ``--same-random-oligo`` is set, in which case a single
-      sequence is generated once and reused for every oligo.
+      each call, retrying collisions so every oligo receives a unique flank,
+      **unless** ``--same-random-oligo`` is set, in which case a single sequence
+      is generated once and reused for every oligo.
     * When no option is given for an end the callable returns ``""``.
 
     Parameters
@@ -221,6 +224,9 @@ def _make_flank_generators(args: argparse.Namespace, rng: random.Random):
         Parsed argument namespace.
     rng:
         Shared :class:`random.Random` instance used for all random draws.
+    count:
+        Number of flanks that will be requested.  Used to reject requests that
+        exceed the available sequence space.
     """
 
     def _end_gen(fixed: str | None, random_length: int | None):
@@ -231,8 +237,22 @@ def _make_flank_generators(args: argparse.Namespace, rng: random.Random):
             if args.same_random_oligo:
                 val = "".join(rng.choice("ACGT") for _ in range(random_length))
                 return lambda: val
+            if count > 4**random_length:
+                raise ValueError(
+                    f"cannot generate {count} unique random flanks of length "
+                    f"{random_length}; at most {4**random_length} are available"
+                )
             n = random_length
-            return lambda: "".join(rng.choice("ACGT") for _ in range(n))
+            seen: set[str] = set()
+
+            def unique_random_flank() -> str:
+                while True:
+                    value = "".join(rng.choice("ACGT") for _ in range(n))
+                    if value not in seen:
+                        seen.add(value)
+                        return value
+
+            return unique_random_flank
         return lambda: ""
 
     return (
@@ -336,7 +356,12 @@ def main(argv: list[str] | None = None) -> int:
     # Build per-oligo flank generators.  With --same-random-oligo the random
     # sequences are generated once (before the main loop) and reused; without
     # the flag each call produces a fresh random sequence.
-    five_prime_gen, three_prime_gen = _make_flank_generators(args, rng)
+    try:
+        five_prime_gen, three_prime_gen = _make_flank_generators(
+            args, rng, args.count
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     # Generate oligos and apply flanks per-oligo
     width = len(str(args.count))
