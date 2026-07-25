@@ -5,6 +5,8 @@ Usage
 ::
 
     generate-oligos [--count N] [--length L] [--seed S]
+                    [--five-prime-spacer SEQ] [--three-prime-spacer SEQ]
+                    [--five-prime-random-length N] [--three-prime-random-length N]
                     [--fasta FILE] [--json FILE] [--tsv FILE]
 
 Run ``generate-oligos --help`` for the full option list.
@@ -69,6 +71,59 @@ def _build_parser() -> argparse.ArgumentParser:
         default="oligo",
         metavar="PREFIX",
         help="Name prefix for generated oligos (default: 'oligo').",
+    )
+
+    # Flank / spacer options
+    flank = parser.add_argument_group("flanks")
+    flank.add_argument(
+        "--five-prime-spacer",
+        metavar="SEQ",
+        default=None,
+        help=(
+            "ACGT sequence to prepend as a 5' flank to every oligo.  "
+            "Mutually exclusive with --five-prime-random-length."
+        ),
+    )
+    flank.add_argument(
+        "--three-prime-spacer",
+        metavar="SEQ",
+        default=None,
+        help=(
+            "ACGT sequence to append as a 3' flank to every oligo.  "
+            "Mutually exclusive with --three-prime-random-length."
+        ),
+    )
+    flank.add_argument(
+        "--five-prime-random-length",
+        type=int,
+        metavar="N",
+        default=None,
+        help=(
+            "Generate a random ACGT sequence of length N as the 5' flank.  "
+            "Mutually exclusive with --five-prime-spacer."
+        ),
+    )
+    flank.add_argument(
+        "--three-prime-random-length",
+        type=int,
+        metavar="N",
+        default=None,
+        help=(
+            "Generate a random ACGT sequence of length N as the 3' flank.  "
+            "Mutually exclusive with --three-prime-spacer."
+        ),
+    )
+    flank.add_argument(
+        "--same-random-oligo",
+        action="store_true",
+        default=False,
+        help=(
+            "When --five-prime-random-length or --three-prime-random-length is set, "
+            "generate one random flank sequence and apply it to every oligo instead "
+            "of generating a unique random flank per oligo.  "
+            "Implies --deduplicate, because the shared flank limits sequence diversity.  "
+            "Requires at least one --*-random-length option."
+        ),
     )
 
     # Analysis options
@@ -147,6 +202,72 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _make_flank_generators(
+    args: argparse.Namespace, rng: random.Random, count: int = 1
+):
+    """Return ``(five_prime_fn, three_prime_fn)`` callables for per-oligo flank generation.
+
+    Each callable takes no arguments and returns a flank string for one oligo:
+
+    * Fixed spacers (``--five-prime-spacer`` / ``--three-prime-spacer``) always
+      return the same upper-cased string.
+    * Random-length flanks (``--five-prime-random-length`` /
+      ``--three-prime-random-length``) return a **new** random ACGT sequence on
+      each call, retrying collisions so every oligo receives a unique flank,
+      **unless** ``--same-random-oligo`` is set, in which case a single sequence
+      is generated once and reused for every oligo.
+    * When no option is given for an end the callable returns ``""``.
+
+    Parameters
+    ----------
+    args:
+        Parsed argument namespace.
+    rng:
+        Shared :class:`random.Random` instance used for all random draws.
+    count:
+        Number of flanks that will be requested.  Used to reject requests that
+        exceed the available sequence space.
+    """
+
+    def _end_gen(fixed: str | None, random_length: int | None):
+        if fixed is not None:
+            val = fixed.upper()
+            return lambda: val
+        if random_length is not None:
+            if args.same_random_oligo:
+                val = "".join(rng.choice("ACGT") for _ in range(random_length))
+                return lambda: val
+            if count > 4**random_length:
+                raise ValueError(
+                    f"cannot generate {count} unique random flanks of length "
+                    f"{random_length}; at most {4**random_length} are available"
+                )
+            n = random_length
+            seen: set[str] = set()
+
+            def unique_random_flank() -> str:
+                while True:
+                    value = "".join(rng.choice("ACGT") for _ in range(n))
+                    if value not in seen:
+                        seen.add(value)
+                        return value
+
+            return unique_random_flank
+        return lambda: ""
+
+    return (
+        _end_gen(args.five_prime_spacer, args.five_prime_random_length),
+        _end_gen(args.three_prime_spacer, args.three_prime_random_length),
+    )
+
+
+# Keep a thin alias for backwards-compatibility with any external callers.
+def _resolve_flanks(args: argparse.Namespace, rng: random.Random) -> tuple[str, str]:
+    """Deprecated – use :func:`_make_flank_generators` instead."""
+    five_fn, three_fn = _make_flank_generators(args, rng)
+    return five_fn(), three_fn()
+
+
 def _print_summary(analyses: list[OligoAnalysis]) -> None:
     """Print a human-readable summary to stdout."""
     flagged = [a for a in analyses if (
@@ -201,16 +322,64 @@ def main(argv: list[str] | None = None) -> int:
     if args.length < 1:
         parser.error("--length must be >= 1")
 
+    # Flank validation
+    if args.five_prime_spacer is not None and args.five_prime_random_length is not None:
+        parser.error(
+            "--five-prime-spacer and --five-prime-random-length are mutually exclusive"
+        )
+    if args.three_prime_spacer is not None and args.three_prime_random_length is not None:
+        parser.error(
+            "--three-prime-spacer and --three-prime-random-length are mutually exclusive"
+        )
+    if args.five_prime_spacer is not None and not set(
+        args.five_prime_spacer.upper()
+    ).issubset(set("ACGT")):
+        parser.error("--five-prime-spacer must contain only A, C, G, T bases")
+    if args.three_prime_spacer is not None and not set(
+        args.three_prime_spacer.upper()
+    ).issubset(set("ACGT")):
+        parser.error("--three-prime-spacer must contain only A, C, G, T bases")
+    if args.five_prime_random_length is not None and args.five_prime_random_length < 1:
+        parser.error("--five-prime-random-length must be >= 1")
+    if args.three_prime_random_length is not None and args.three_prime_random_length < 1:
+        parser.error("--three-prime-random-length must be >= 1")
+    if args.same_random_oligo and (
+        args.five_prime_random_length is None and args.three_prime_random_length is None
+    ):
+        parser.error(
+            "--same-random-oligo requires at least one of "
+            "--five-prime-random-length or --three-prime-random-length"
+        )
+
     rng = random.Random(args.seed)
 
-    # Generate oligos
+    # Build per-oligo flank generators.  With --same-random-oligo the random
+    # sequences are generated once (before the main loop) and reused; without
+    # the flag each call produces a fresh random sequence.
+    try:
+        five_prime_gen, three_prime_gen = _make_flank_generators(
+            args, rng, args.count
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    # Generate oligos and apply flanks per-oligo
     width = len(str(args.count))
     names: list[str] = []
     oligos: list[DNA] = []
     for i in range(1, args.count + 1):
         name = f"{args.prefix}{i:0{width}}"
         names.append(name)
-        oligos.append(random_oligo(length=args.length, rng=rng))
+        oligo = random_oligo(length=args.length, rng=rng)
+        five = five_prime_gen()
+        three = three_prime_gen()
+        if five or three:
+            oligo = DNA(five + str(oligo) + three)
+        oligos.append(oligo)
+
+    # --same-random-oligo limits diversity, so automatically deduplicate
+    if args.same_random_oligo:
+        args.deduplicate = True
 
     # Remove duplicate sequences if requested
     if args.deduplicate:

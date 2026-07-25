@@ -489,6 +489,163 @@ class TestCLI:
     def test_deduplicate_flag_exits_zero(self) -> None:
         assert main(["--count", "5", "--length", "20", "--quiet", "--seed", "1", "--deduplicate"]) == 0
 
+# ---------------------------------------------------------------------------
+# CLI flank / spacer options
+# ---------------------------------------------------------------------------
+
+
+class TestCLIFlanks:
+    """Tests for --five-prime-spacer, --three-prime-spacer, and random-length
+    flanking-sequence options on the generate-oligos CLI."""
+
+    def test_five_prime_spacer_prepended(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--five-prime-spacer", "AAAA",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("AAAA")
+            assert item["length"] == 14
+
+    def test_three_prime_spacer_appended(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--three-prime-spacer", "TTTT",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].endswith("TTTT")
+            assert item["length"] == 14
+
+    def test_both_spacers_applied(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "2", "--length", "10",
+            "--five-prime-spacer", "GGG",
+            "--three-prime-spacer", "CCC",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("GGG")
+            assert item["sequence"].endswith("CCC")
+            assert item["length"] == 16
+
+    def test_five_prime_random_length(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--five-prime-random-length", "5",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["length"] == 15
+
+    def test_three_prime_random_length(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "10",
+            "--three-prime-random-length", "6",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["length"] == 16
+
+    def test_random_flanks_are_valid_bases(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "5", "--length", "10",
+            "--five-prime-random-length", "4",
+            "--three-prime-random-length", "4",
+            "--json", path, "--quiet", "--seed", "42",
+        ])
+        data = json.loads(open(path).read())
+        valid = set("ACGT")
+        for item in data:
+            assert set(item["sequence"]).issubset(valid)
+
+    def test_random_flanks_reproducible_with_seed(self, tmp_path) -> None:
+        f1 = str(tmp_path / "a.json")
+        f2 = str(tmp_path / "b.json")
+        main(["--count", "3", "--length", "10", "--five-prime-random-length", "5",
+              "--json", f1, "--quiet", "--seed", "99"])
+        main(["--count", "3", "--length", "10", "--five-prime-random-length", "5",
+              "--json", f2, "--quiet", "--seed", "99"])
+        assert open(f1).read() == open(f2).read()
+
+    def test_spacer_lowercase_accepted(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "2", "--length", "10",
+            "--five-prime-spacer", "acgt",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["sequence"].startswith("ACGT")
+
+    def test_no_flanks_unchanged(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main(["--count", "3", "--length", "10", "--json", path, "--quiet", "--seed", "1"])
+        data = json.loads(open(path).read())
+        for item in data:
+            assert item["length"] == 10
+
+    def test_mutually_exclusive_five_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-spacer", "AAAA",
+                "--five-prime-random-length", "4",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_mutually_exclusive_three_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--three-prime-spacer", "TTTT",
+                "--three-prime-random-length", "4",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_invalid_bases_five_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-spacer", "AAAXTT",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_invalid_bases_three_prime(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--three-prime-spacer", "NNNN",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_random_length_zero_exits_nonzero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-random-length", "0",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+
     def test_deduplicate_no_duplicates_keeps_all(self, tmp_path) -> None:
         # With a long length and small count, duplicates are astronomically unlikely
         path = str(tmp_path / "out.json")
@@ -519,8 +676,101 @@ class TestCLI:
         captured = capsys.readouterr()
         assert "Removed" not in captured.out
 
+    # --same-random-oligo tests
 
-class TestReadJson:
+    def test_same_random_oligo_all_flanks_equal(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "5", "--length", "10",
+            "--five-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        prefixes = [item["sequence"][:4] for item in data]
+        assert len(set(prefixes)) == 1, "all oligos should share the same 5' random flank"
+
+    def test_same_random_oligo_three_prime_all_equal(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "5", "--length", "10",
+            "--three-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        suffixes = [item["sequence"][-4:] for item in data]
+        assert len(set(suffixes)) == 1, "all oligos should share the same 3' random flank"
+
+    def test_without_same_random_oligo_flanks_differ(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "10", "--length", "10",
+            "--five-prime-random-length", "6",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        prefixes = [item["sequence"][:6] for item in data]
+        # With 10 oligos and length-6 flanks it would be astronomically unlikely
+        # for all prefixes to collide — expect at least 2 distinct values.
+        assert len(set(prefixes)) > 1, "each oligo should get a unique random 5' flank"
+
+    def test_random_flanks_are_all_unique(self, tmp_path) -> None:
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "4", "--length", "10",
+            "--five-prime-random-length", "1",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        prefixes = [item["sequence"][:1] for item in json.loads(open(path).read())]
+        assert len(set(prefixes)) == 4
+
+    def test_unique_random_flank_capacity_is_validated(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "5", "--length", "10",
+                "--five-prime-random-length", "1", "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_same_random_oligo_implies_deduplicate(self, tmp_path, monkeypatch) -> None:
+        # Force every oligo core to be the same; with --same-random-oligo the
+        # shared flank means all final sequences are identical → dedup leaves 1.
+        import OligoDesigner.cli as cli_module
+        monkeypatch.setattr(cli_module, "random_oligo", lambda length, rng: DNA("ACGT" * 5))
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "3", "--length", "20",
+            "--five-prime-random-length", "4",
+            "--same-random-oligo",
+            "--json", path, "--quiet", "--seed", "1",
+        ])
+        data = json.loads(open(path).read())
+        assert len(data) == 1
+
+    def test_same_random_oligo_requires_random_length(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--count", "2", "--length", "10",
+                "--five-prime-spacer", "AAAA",
+                "--same-random-oligo",
+                "--quiet",
+            ])
+        assert exc.value.code != 0
+
+    def test_same_random_oligo_reproducible_with_seed(self, tmp_path) -> None:
+        f1 = str(tmp_path / "a.json")
+        f2 = str(tmp_path / "b.json")
+        main(["--count", "4", "--length", "10", "--five-prime-random-length", "5",
+              "--same-random-oligo", "--json", f1, "--quiet", "--seed", "7"])
+        main(["--count", "4", "--length", "10", "--five-prime-random-length", "5",
+              "--same-random-oligo", "--json", f2, "--quiet", "--seed", "7"])
+        assert open(f1).read() == open(f2).read()
+
+
+# ---------------------------------------------------------------------------
+# read_json
+# ---------------------------------------------------------------------------
     def _write_oligo_analyses(self, tmp_path) -> tuple[list[OligoAnalysis], str]:
         analyses = [
             analyse_oligo(DNA("ACGT"), name="o1"),

@@ -39,6 +39,17 @@ generate-oligos [options]
 | `--seed S` | *(none)* | Integer seed for reproducible output |
 | `--prefix PREFIX` | `oligo` | Name prefix for generated oligos |
 
+#### Flank / spacer options
+
+Spacers are added at the outer ends of every generated oligo.  For each end you can provide either an explicit sequence **or** a random-length option — not both.  If neither is given, no spacer is added.
+
+| Option | Description |
+|--------|-------------|
+| `--five-prime-spacer SEQ` | Fixed ACGT sequence to prepend to every oligo (5' flank) |
+| `--three-prime-spacer SEQ` | Fixed ACGT sequence to append to every oligo (3' flank) |
+| `--five-prime-random-length N` | Generate a random ACGT sequence of length N as the 5' flank |
+| `--three-prime-random-length N` | Generate a random ACGT sequence of length N as the 3' flank |
+
 #### Analysis options
 
 | Option | Default | Description |
@@ -66,6 +77,17 @@ generate-oligos --count 20 --length 35 --seed 42 --fasta output.fa --tsv output.
 
 # Stricter hairpin detection, save JSON only (no stdout output)
 generate-oligos -n 5 -l 50 --min-stem 5 --max-loop 6 --quiet --json data.json
+
+# Add fixed adapter sequences at both ends
+generate-oligos --count 10 --length 40 \
+  --five-prime-spacer AGATCGGAAGAGC \
+  --three-prime-spacer CTCTTCCGATCT \
+  --fasta flanked.fa
+
+# Add random flanks of specified length (same length for each end but different sequences)
+generate-oligos --count 10 --length 40 --seed 1 \
+  --five-prime-random-length 8 --three-prime-random-length 8 \
+  --fasta flanked.fa
 ```
 
 ---
@@ -90,6 +112,17 @@ generate-structured-oligos [options]
 | `--spacer-length S` | 2 | Spacer length: `0` or `2–6` bp |
 | `--seed S` | *(none)* | Integer seed for reproducible output |
 | `--prefix PREFIX` | `soligo` | Name prefix for generated oligos |
+
+#### Flank / spacer options
+
+Spacers are added at the outer ends of every generated oligo.  For each end you can provide either an explicit sequence **or** a random-length option — not both.  If neither is given, no spacer is added.
+
+| Option | Description |
+|--------|-------------|
+| `--five-prime-spacer SEQ` | Fixed ACGT sequence to prepend to every oligo (5' flank) |
+| `--three-prime-spacer SEQ` | Fixed ACGT sequence to append to every oligo (3' flank) |
+| `--five-prime-random-length N` | Generate a random ACGT sequence of length N as the 5' flank |
+| `--three-prime-random-length N` | Generate a random ACGT sequence of length N as the 3' flank |
 
 #### Output options
 
@@ -123,6 +156,17 @@ generate-structured-oligos --type palindrome --count 10 --spacer-length 0 \
 generate-structured-oligos --type inverted_repeat -n 5 \
   --outer-arm-length 10 --inner-half-length 8 --spacer-length 2 \
   --prefix ir_ --fasta ir_oligos.fa
+
+# Add fixed adapter sequences at both ends of every structured oligo
+generate-structured-oligos --type palindrome --count 10 \
+  --five-prime-spacer AGATCGGAAGAGC \
+  --three-prime-spacer CTCTTCCGATCT \
+  --fasta flanked.fa
+
+# Add random flanks of specified length
+generate-structured-oligos --type all --count 5 --seed 1 \
+  --five-prime-random-length 8 --three-prime-random-length 8 \
+  --fasta flanked.fa
 ```
 
 ---
