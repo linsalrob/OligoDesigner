@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Generate and analyse DNA oligonucleotides locally in your browser.">
+  <title>OligoDesigner</title><link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header><a class="brand" href="#">Oligo<span>Designer</span></a><p>Private, local DNA design tools</p></header>
+<main>
+  <section class="hero"><p class="eyebrow">Browser edition</p><h1>Design oligos.<br><em>Keep your data local.</em></h1><p>Generate, analyse and export DNA sequences without sending a single base to a server.</p></section>
+  <nav class="tools" aria-label="Tools">
+    <button class="active" data-panel="random">Generate oligos</button><button data-panel="structured">Structured oligos</button><button data-panel="logo">Sequence logo</button>
+  </nav>
+
+  <section id="random" class="panel active"><div class="panel-head"><div><span>01</span><h2>Generate oligos</h2></div><p>Random DNA sequences with structural quality analysis.</p></div><form id="random-form">
+    <fieldset><legend>Generation</legend><div class="grid"><label>Number of oligos<input name="count" type="number" min="1" value="10" required></label><label>Sequence length<input name="length" type="number" min="1" value="40" required></label><label>Random seed <small>optional</small><input name="seed" type="number" placeholder="Unseeded"></label><label>Name prefix<input name="prefix" value="oligo" required></label></div></fieldset>
+    <div class="two-col"><fieldset><legend>5′ flank</legend><label>Fixed sequence<input name="fivePrime" pattern="[ACGTacgt]*" placeholder="None"></label><span class="or">or</span><label>Random length<input name="fiveRandomLength" type="number" min="1" placeholder="None"></label></fieldset><fieldset><legend>3′ flank</legend><label>Fixed sequence<input name="threePrime" pattern="[ACGTacgt]*" placeholder="None"></label><span class="or">or</span><label>Random length<input name="threeRandomLength" type="number" min="1" placeholder="None"></label></fieldset></div>
+    <div data-common></div><button class="primary" type="submit">Generate sequences <span>→</span></button>
+  </form></section>
+
+  <section id="structured" class="panel"><div class="panel-head"><div><span>02</span><h2>Structured oligos</h2></div><p>Palindromes, inverted repeats and AT-rich motifs.</p></div><form id="structured-form">
+    <fieldset><legend>Structure</legend><div class="grid"><label>Oligo type<select name="type"><option value="all">All three types</option><option value="palindrome">Palindrome</option><option value="inverted_repeat">Inverted repeat</option><option value="at_rich">AT-rich palindrome</option></select></label><label>Count per type<input name="count" type="number" min="1" value="5" required></label><label>Half length<input name="halfLength" type="number" min="1" value="6" required></label><label>Outer arm length<input name="outerArmLength" type="number" min="1" value="8" required></label><label>Inner half length<input name="innerHalfLength" type="number" min="1" value="6" required></label><label>Spacer length<select name="spacerLength"><option>0</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label><label>Random seed <small>optional</small><input name="seed" type="number" placeholder="Unseeded"></label><label>Name prefix<input name="prefix" value="soligo" required></label></div></fieldset>
+    <div class="two-col"><fieldset><legend>5′ flank</legend><label>Fixed sequence<input name="fivePrime" pattern="[ACGTacgt]*" placeholder="None"></label><span class="or">or</span><label>Random length<input name="fiveRandomLength" type="number" min="1" placeholder="None"></label></fieldset><fieldset><legend>3′ flank</legend><label>Fixed sequence<input name="threePrime" pattern="[ACGTacgt]*" placeholder="None"></label><span class="or">or</span><label>Random length<input name="threeRandomLength" type="number" min="1" placeholder="None"></label></fieldset></div>
+    <div data-common></div><button class="primary" type="submit">Generate structures <span>→</span></button>
+  </form></section>
+
+  <section id="logo" class="panel"><div class="panel-head"><div><span>03</span><h2>Sequence logo</h2></div><p>Visualise positional nucleotide composition from FASTA or JSON.</p></div><form id="logo-form">
+    <label id="drop-zone" class="drop"><input id="logo-file" type="file" accept=".json,.fa,.fasta,.fna,.fas,application/json" required><strong>Drop FASTA or JSON here</strong><span>or click to select a local file</span></label>
+    <fieldset><legend>Logo options</legend><div class="grid"><label>Logo type<select name="logoType"><option value="counts">Counts</option><option value="probability">Probability</option><option value="information">Information (bits)</option></select></label><label>Stack order<select name="stackOrder"><option value="value">By value</option><option value="alphabetical">Alphabetical</option></select></label><label>Title<input name="title" placeholder="No title"></label><label>Colour scheme<select name="colorScheme"><option value="classic">Classic</option><option value="base_pairing">Base pairing</option><option value="najafabadi">Najafabadi et al.</option></select></label><label>Width (inches)<input name="width" type="number" min="1" step="0.5" value="10"></label><label>Height (inches)<input name="height" type="number" min="1" step="0.5" value="3"></label><label>Resolution (DPI)<input name="dpi" type="number" min="72" value="150"></label><label>Input format<select name="format"><option value="auto">Auto-detect</option><option value="json">JSON</option><option value="fasta">FASTA</option></select></label></div></fieldset>
+    <button class="primary" type="submit">Create logo <span>→</span></button>
+  </form><div id="logo-result" class="result hidden"></div></section>
+  <section id="results" class="result hidden" aria-live="polite"></section>
+</main><footer><span>OligoDesigner</span><p>All processing happens on this device. No data is uploaded.</p></footer>
+<template id="common-template"><fieldset><legend>Analysis</legend><div class="grid"><label>Minimum stem<input name="minStem" type="number" min="1" value="4"></label><label>Minimum loop<input name="minLoop" type="number" min="1" value="3"></label><label>Maximum loop<input name="maxLoop" type="number" min="1" value="8"></label><label>Homopolymer run<input name="minHpRun" type="number" min="1" value="4"></label><label>Minimum overlap<input name="minOverlap" type="number" min="1" value="10"></label></div><div class="checks"><label><input name="sameRandom" type="checkbox"> Use the same random flank for every oligo</label><label><input name="deduplicate" type="checkbox"> Remove duplicate sequences</label></div></fieldset><fieldset><legend>Downloads</legend><div class="checks"><label><input name="fasta" type="checkbox" checked> FASTA</label><label><input name="json" type="checkbox"> JSON</label><label><input name="tsv" type="checkbox"> TSV</label></div></fieldset></template>
+<script type="module" src="app.js"></script></body></html>

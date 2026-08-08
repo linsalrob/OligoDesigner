@@ -2,6 +2,17 @@
 
 A Python library and command-line toolkit for designing DNA oligonucleotides for phage screens. OligoDesigner generates random and structured oligos, analyses them for problematic secondary-structure features (hairpins, homopolymers, low-complexity regions, tandem repeats, and cross-complementarity), and writes results to FASTA, JSON, and TSV formats.
 
+## Browser application
+
+The repository also includes a static, browser-only interface for all three tools. Open the [GitHub Pages site](https://linsalrob.github.io/OligoDesigner/) or serve the repository with any static file server and visit `/`. The application:
+
+- generates random and structured oligos with the same options and analysis heuristics as the command-line tools;
+- downloads selected FASTA, JSON, and TSV outputs locally;
+- reads local FASTA or OligoDesigner JSON files and renders sequence logos as SVG; and
+- has no server component, external runtime dependencies, analytics, or network requests. Input sequences never leave the browser.
+
+To run the browser tests, use `npm run test:web` (Node.js 20 or newer; no install step is required).
+
 ## Installation
 
 See [INSTALLATION.md](INSTALLATION.md) for full instructions. In short:
