@@ -157,8 +157,8 @@ export const toJson = entries => JSON.stringify(entries, null, 2) + "\n";
 export function toTsv(entries) {
   if (!entries.length) return "";
   const structured = "oligo_type" in entries[0];
-  const headers = structured ? ["name","sequence","length","oligo_type","left_arm","right_arm","spacer","inner_left","inner_right","is_palindrome","inner_is_palindrome","gc_content","entropy","tm","has_hairpin","has_homopolymer","has_tandem_repeat","complementary_to"] : ["name","sequence","length","gc_content","entropy","tm","A","C","G","T","longest_homopolymer","has_homopolymer","is_low_complexity","is_palindrome","has_hairpin","has_tandem_repeat","complementary_to"];
-  const value = (item, key) => key in item.base_composition ? item.base_composition[key] : key === "complementary_to" ? item[key].join(",") : ["gc_content","entropy"].includes(key) ? item[key].toFixed(4) : key === "tm" ? (item[key] == null ? "" : item[key].toFixed(2)) : item[key];
+  const headers = structured ? ["name","sequence","length","oligo_type","left_arm","right_arm","spacer","inner_left","inner_right","is_palindrome","inner_is_palindrome","gc_content","entropy","tm","has_hairpin","has_homopolymer","has_tandem_repeat","complementary_to"] : ["name","sequence","length","gc_content","entropy","tm","count_A","count_C","count_G","count_T","longest_homopolymer","has_homopolymer","is_low_complexity","is_palindrome","has_hairpin","has_tandem_repeat","complementary_to"];
+  const value = (item, key) => key.startsWith("count_") ? item.base_composition[key.at(-1)] : key === "complementary_to" ? item[key].join(",") : ["gc_content","entropy"].includes(key) ? item[key].toFixed(4) : key === "tm" ? (item[key] == null ? "" : item[key].toFixed(2)) : item[key];
   return [headers.join("\t"), ...entries.map(item => headers.map(key => value(item,key)).join("\t"))].join("\n") + "\n";
 }
 
@@ -177,9 +177,15 @@ export function logoMatrix(sequences, type = "counts") {
   return Array.from({length: width}, (_, position) => {
     const counts = Object.fromEntries([...BASES].map(base => [base, sequences.filter(seq => seq[position] === base).length]));
     if (type === "counts") return counts;
-    const probability = Object.fromEntries([...BASES].map(base => [base, counts[base] / sequences.length]));
+    const observed = Object.values(counts).reduce((total, count) => total + count, 0);
+    const probability = Object.fromEntries([...BASES].map(base => [base, observed ? counts[base] / observed : 0]));
     if (type === "probability") return probability;
     const h = -Object.values(probability).reduce((sum,p) => sum + (p ? p * Math.log2(p) : 0), 0), information = 2 - h;
     return Object.fromEntries([...BASES].map(base => [base, probability[base] * information]));
   });
+}
+
+export function logoStackBases(column, stackOrder) {
+  if (stackOrder === "alphabetical") return ["T", "G", "C", "A"];
+  return ["A", "C", "G", "T"].sort((a, b) => column[b] - column[a]);
 }
