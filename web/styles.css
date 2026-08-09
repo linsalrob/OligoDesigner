@@ -82,7 +82,7 @@ input::placeholder { color: #94a3b8; }
 .drop strong { font-size: 15px; }
 .drop span { color: var(--muted); font-size: 13px; font-weight: 400; }
 
-.result { display: block; margin-top: 20px; padding: 20px 24px; overflow: auto; }
+.result { display: block; margin-top: 20px; padding: 20px 24px; overflow: auto; scroll-margin-top: 76px; }
 .result.hidden { display: none; }
 .result.error { border-color: #fecaca; background: var(--danger-soft); color: var(--danger); }
 .result-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
