@@ -3,7 +3,10 @@ import { generateOligos, generateStructuredOligos, logoMatrix, logoStackBases, p
 document.querySelectorAll("[data-common]").forEach(target => target.append(document.querySelector("#common-template").content.cloneNode(true)));
 const panels = document.querySelectorAll(".panel");
 document.querySelectorAll(".tools button").forEach(button => button.addEventListener("click", () => {
-  document.querySelectorAll(".tools button").forEach(item => item.classList.toggle("active", item === button));
+  document.querySelectorAll(".tools button").forEach(item => {
+    item.classList.toggle("active", item === button);
+    item.setAttribute("aria-pressed", String(item === button));
+  });
   panels.forEach(panel => panel.classList.toggle("active", panel.id === button.dataset.panel));
   document.querySelector("#results").classList.add("hidden");
 }));
@@ -20,16 +23,24 @@ function download(content, filename, type) {
 }
 function showEntries(entries, form, basename) {
   const result = document.querySelector("#results"), formats = [];
+  result.className = "result";
+  result.removeAttribute("role");
   if (form.elements.fasta.checked) formats.push(["FASTA", toFasta(entries), `${basename}.fasta`, "text/plain"]);
   if (form.elements.json.checked) formats.push(["JSON", toJson(entries), `${basename}.json`, "application/json"]);
   if (form.elements.tsv.checked) formats.push(["TSV", toTsv(entries), `${basename}.tsv`, "text/tab-separated-values"]);
   const rows = entries.slice(0, 100).map(item => `<tr><td>${escapeHtml(item.name)}</td><td class="sequence" title="${item.sequence}">${item.sequence}</td><td>${item.length}</td><td>${(item.gc_content*100).toFixed(1)}%</td><td>${item.tm == null ? "—" : item.tm.toFixed(1)}</td><td>${item.has_hairpin ? "Yes" : "No"}</td><td>${item.has_homopolymer ? "Yes" : "No"}</td></tr>`).join("");
   result.innerHTML = `<div class="result-head"><div><p class="eyebrow">Generated locally</p><h2>${entries.length} sequences</h2></div><div class="download-links"></div></div><table><thead><tr><th>Name</th><th>Sequence</th><th>Length</th><th>GC</th><th>Tm °C</th><th>Hairpin</th><th>Homopolymer</th></tr></thead><tbody>${rows}</tbody></table>${entries.length>100?"<p>Preview limited to the first 100 sequences. Downloads contain every entry.</p>":""}`;
   for (const [label,content,filename,type] of formats) { const button=document.createElement("button"); button.textContent=`Download ${label}`; button.addEventListener("click",()=>download(content,filename,type)); result.querySelector(".download-links").append(button); }
-  result.classList.remove("hidden"); result.scrollIntoView({behavior:"smooth"});
+  result.classList.remove("hidden"); result.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
 }
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
-function handleError(error) { alert(error instanceof Error ? error.message : String(error)); }
+function handleError(error) {
+  const result = document.querySelector("#results");
+  result.className = "result error";
+  result.setAttribute("role", "alert");
+  result.textContent = error instanceof Error ? error.message : String(error);
+  result.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
 
 document.querySelector("#random-form").addEventListener("submit", event => { event.preventDefault(); try { const options={...commonOptions(event.currentTarget),length:number(new FormData(event.currentTarget),"length")}; showEntries(generateOligos(options),event.currentTarget,"oligos"); } catch(error){handleError(error);} });
 document.querySelector("#structured-form").addEventListener("submit", event => { event.preventDefault(); try { const data=new FormData(event.currentTarget), options={...commonOptions(event.currentTarget),type:data.get("type"),halfLength:number(data,"halfLength"),outerArmLength:number(data,"outerArmLength"),innerHalfLength:number(data,"innerHalfLength"),spacerLength:number(data,"spacerLength")}; showEntries(generateStructuredOligos(options),event.currentTarget,"structured-oligos"); } catch(error){handleError(error);} });
@@ -49,4 +60,4 @@ function renderLogo(sequences, options) {
   body+=`<text transform="translate(16 ${margin.top+plotHeight/2}) rotate(-90)" text-anchor="middle" font-size="12">${options.logoType==="information"?"Information (bits)":options.logoType==="probability"?"Probability":"Count"}</text><text x="${margin.left+plotWidth/2}" y="${cssHeight-5}" text-anchor="middle" font-size="12">Position</text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${cssWidth} ${cssHeight}" role="img" aria-label="DNA sequence logo">${body}</svg>`;
 }
-document.querySelector("#logo-form").addEventListener("submit",async event=>{event.preventDefault();try{const file=fileInput.files[0];if(!file)throw new Error("Choose a FASTA or JSON file.");const data=new FormData(event.currentTarget),sequences=parseSequenceFile(await file.text(),data.get("format"),file.name),options=Object.fromEntries(data);const svg=renderLogo(sequences,options),result=document.querySelector("#logo-result");result.innerHTML=`<div class="result-head"><div><p class="eyebrow">Rendered locally</p><h2>${sequences.length} sequences</h2></div><div class="download-links"><button id="download-svg">Download SVG</button></div></div><div class="logo-wrap">${svg}</div>`;result.querySelector("#download-svg").addEventListener("click",()=>download(svg,"sequence-logo.svg","image/svg+xml"));result.classList.remove("hidden");result.scrollIntoView({behavior:"smooth"});}catch(error){handleError(error);}});
+document.querySelector("#logo-form").addEventListener("submit",async event=>{event.preventDefault();try{const file=fileInput.files[0];if(!file)throw new Error("Choose a FASTA or JSON file.");const data=new FormData(event.currentTarget),sequences=parseSequenceFile(await file.text(),data.get("format"),file.name),options=Object.fromEntries(data);const svg=renderLogo(sequences,options),result=document.querySelector("#logo-result");result.innerHTML=`<div class="result-head"><div><p class="eyebrow">Rendered locally</p><h2>${sequences.length} sequences</h2></div><div class="download-links"><button id="download-svg">Download SVG</button></div></div><div class="logo-wrap">${svg}</div>`;result.querySelector("#download-svg").addEventListener("click",()=>download(svg,"sequence-logo.svg","image/svg+xml"));result.classList.remove("hidden");result.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});}catch(error){handleError(error);}});
