@@ -6,11 +6,11 @@
   <title>OligoDesigner</title><link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header><a class="brand" href="#">Oligo<span>Designer</span></a><p>Private, local DNA design tools</p></header>
+<header><div class="header-inner"><a class="brand" href="#">OligoDesigner</a><p class="local-pill">Private · Runs locally</p></div></header>
 <main>
-  <section class="hero"><p class="eyebrow">Browser edition</p><h1>Design oligos.<br><em>Keep your data local.</em></h1><p>Generate, analyse and export DNA sequences without sending a single base to a server.</p></section>
+  <section class="hero"><p class="eyebrow">Browser tools</p><h1>Design and analyse oligos</h1><p>Generate, inspect, and export DNA sequences in your browser. Your files and sequences never leave this device.</p></section>
   <nav class="tools" aria-label="Tools">
-    <button class="active" data-panel="random">Generate oligos</button><button data-panel="structured">Structured oligos</button><button data-panel="logo">Sequence logo</button>
+    <button class="active" data-panel="random" aria-pressed="true">Generate oligos</button><button data-panel="structured" aria-pressed="false">Structured oligos</button><button data-panel="logo" aria-pressed="false">Sequence logo</button>
   </nav>
 
   <section id="random" class="panel active"><div class="panel-head"><div><span>01</span><h2>Generate oligos</h2></div><p>Random DNA sequences with structural quality analysis.</p></div><form id="random-form">
