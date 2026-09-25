@@ -929,7 +929,7 @@ class TestSequenceLogo:
     @pytest.fixture(autouse=True)
     def _require_viz(self):
         pytest.importorskip("logomaker")
-        pytest.importorskip("matplotlib")
+        pytest.importorskip("matplotlib.pyplot")
 
     def _oligos(self) -> list[OligoAnalysis]:
         return [
