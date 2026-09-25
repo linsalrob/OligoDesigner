@@ -36,19 +36,19 @@ def require_viz() -> None:
 # _build_count_matrix
 # ---------------------------------------------------------------------------
 
-def test_build_count_matrix_basic():
+def test_build_count_matrix_basic(require_viz):
     df = _build_count_matrix(["ACGT"])
     assert list(df.columns) == ["A", "C", "G", "T"]
     assert list(df["A"]) == [1, 0, 0, 0]
     assert list(df["T"]) == [0, 0, 0, 1]
 
 
-def test_build_count_matrix_empty_raises():
+def test_build_count_matrix_empty_raises(require_viz):
     with pytest.raises(ValueError, match="empty"):
         _build_count_matrix([])
 
 
-def test_build_count_matrix_truncates():
+def test_build_count_matrix_truncates(require_viz):
     df = _build_count_matrix(["ACGT", "AC"])
     assert len(df) == 2  # truncated to shortest
 
