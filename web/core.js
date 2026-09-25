@@ -107,6 +107,15 @@ function addComplementarity(entries, minOverlap) {
   }
 }
 
+function deduplicate(entries) {
+  const seen = new Set();
+  return entries.filter(item => {
+    if (seen.has(item.sequence)) return false;
+    seen.add(item.sequence);
+    return true;
+  });
+}
+
 function flankGenerator(fixed, length, same, count, random) {
   if (fixed) return () => fixed.toUpperCase();
   if (!length) return () => "";
@@ -131,7 +140,7 @@ export function generateOligos(options) {
   const random = seededRandom(options.seed), five = flankGenerator(options.fivePrime, options.fiveRandomLength, options.sameRandom, options.count, random), three = flankGenerator(options.threePrime, options.threeRandomLength, options.sameRandom, options.count, random);
   const width = String(options.count).length;
   let entries = Array.from({length: options.count}, (_, i) => analyse(five() + randomSequence(options.length, random) + three(), `${options.prefix}${String(i + 1).padStart(width,"0")}`, options));
-  if (options.deduplicate || options.sameRandom) entries = entries.filter((item, i, all) => all.findIndex(other => other.sequence === item.sequence) === i);
+  if (options.deduplicate || options.sameRandom) entries = deduplicate(entries);
   addComplementarity(entries, options.minOverlap); return entries;
 }
 
@@ -148,7 +157,7 @@ export function generateStructuredOligos(options) {
     sequence = five() + sequence + three(); const item = analyse(sequence, `${options.prefix}${String(++index).padStart(width,"0")}`, options);
     Object.assign(item, {oligo_type:oligoType,left_arm:left,right_arm:right,spacer,inner_left:innerLeft,inner_right:innerRight,is_palindrome:right===reverseComplement(left),inner_is_palindrome:innerLeft ? innerRight===reverseComplement(innerLeft) : false,min_stem:options.minStem,min_loop:options.minLoop,max_loop:options.maxLoop,min_hp_run:options.minHpRun}); entries.push(item);
   }
-  if (options.deduplicate || options.sameRandom) entries = entries.filter((item, i, all) => all.findIndex(other => other.sequence === item.sequence) === i);
+  if (options.deduplicate || options.sameRandom) entries = deduplicate(entries);
   addComplementarity(entries, options.minOverlap); return entries;
 }
 
