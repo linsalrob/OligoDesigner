@@ -29,7 +29,7 @@ def _make_oligos(*seqs: str) -> list[SimpleNamespace]:
 def require_viz() -> None:
     """Skip rendering tests when the optional visualization stack is absent."""
     pytest.importorskip("logomaker")
-    pytest.importorskip("matplotlib")
+    pytest.importorskip("matplotlib.pyplot")
 
 
 # ---------------------------------------------------------------------------
