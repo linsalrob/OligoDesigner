@@ -12,7 +12,8 @@ Usage
                                [--five-prime-random-length N] [--three-prime-random-length N]
                                [--seed S] [--prefix PREFIX]
                                [--min-stem N] [--min-loop N] [--max-loop N]
-                               [--min-hp-run N] [--min-overlap N]
+                               [--min-hp-run N] [--min-repeat-count N]
+                               [--min-overlap N] [--remove-tandem-repeats]
                                [--fasta FILE] [--json FILE] [--tsv FILE]
                                [--quiet]
 
@@ -210,6 +211,16 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Minimum overlap for cross-complementarity detection (default: 10).",
     )
+    ana.add_argument(
+        "--min-repeat-count",
+        type=int,
+        default=3,
+        metavar="N",
+        help=(
+            "Minimum consecutive copies of a 2–4 bp motif required within an "
+            "individual arm to flag a tandem repeat (default: 3)."
+        ),
+    )
 
     # Output options
     out = parser.add_argument_group("output")
@@ -246,6 +257,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Remove oligos with duplicate sequences before output, "
             "keeping only the first occurrence of each unique sequence."
+        ),
+    )
+    out.add_argument(
+        "--remove-tandem-repeats",
+        action="store_true",
+        help=(
+            "Remove oligos with a tandem repeat in any outer or inner arm "
+            "before output."
         ),
     )
 
@@ -412,6 +431,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--min-hp-run must be >= 1")
     if args.min_overlap < 1:
         parser.error("--min-overlap must be >= 1")
+    if args.min_repeat_count < 2:
+        parser.error("--min-repeat-count must be >= 2")
 
     # Flank validation
     if args.five_prime_spacer is not None and args.five_prime_random_length is not None:
@@ -494,6 +515,16 @@ def main(argv: list[str] | None = None) -> int:
         oligo.min_loop = args.min_loop
         oligo.max_loop = args.max_loop
         oligo.min_hp_run = args.min_hp_run
+        oligo.min_repeat_count = args.min_repeat_count
+
+    if args.remove_tandem_repeats:
+        removed_repeats = [o.name for o in all_oligos if o.has_tandem_repeat]
+        all_oligos = [o for o in all_oligos if not o.has_tandem_repeat]
+        if removed_repeats and not args.quiet:
+            print(
+                f"Removed {len(removed_repeats)} oligo(s) with tandem repeats "
+                "in arm sequences: " + ", ".join(removed_repeats)
+            )
 
     # Cross-complementarity (ACGT-only sequences used for matching)
     dna_seqs = [DNA("".join(b for b in o.sequence if b in "ACGT")) for o in all_oligos]

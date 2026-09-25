@@ -14,7 +14,7 @@ document.querySelectorAll(".tools button").forEach(button => button.addEventList
 const number = (data, key) => data.get(key) === "" ? null : Number(data.get(key));
 function commonOptions(form) {
   const data = new FormData(form);
-  return { count:number(data,"count"),seed:data.get("seed"),prefix:data.get("prefix"),fivePrime:data.get("fivePrime").trim(),threePrime:data.get("threePrime").trim(),fiveRandomLength:number(data,"fiveRandomLength"),threeRandomLength:number(data,"threeRandomLength"),sameRandom:data.has("sameRandom"),deduplicate:data.has("deduplicate"),minStem:number(data,"minStem"),minLoop:number(data,"minLoop"),maxLoop:number(data,"maxLoop"),minHpRun:number(data,"minHpRun"),minOverlap:number(data,"minOverlap")};
+  return { count:number(data,"count"),seed:data.get("seed"),prefix:data.get("prefix"),fivePrime:data.get("fivePrime").trim(),threePrime:data.get("threePrime").trim(),fiveRandomLength:number(data,"fiveRandomLength"),threeRandomLength:number(data,"threeRandomLength"),sameRandom:data.has("sameRandom"),deduplicate:data.has("deduplicate"),removeTandemRepeats:data.has("removeTandemRepeats"),minStem:number(data,"minStem"),minLoop:number(data,"minLoop"),maxLoop:number(data,"maxLoop"),minHpRun:number(data,"minHpRun"),minRepeatCount:number(data,"minRepeatCount"),minOverlap:number(data,"minOverlap")};
 }
 
 function download(content, filename, type) {

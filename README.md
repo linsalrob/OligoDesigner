@@ -69,6 +69,7 @@ Spacers are added at the outer ends of every generated oligo.  For each end you 
 | `--min-loop N` | 3 | Minimum loop length for hairpin detection |
 | `--max-loop N` | 8 | Maximum loop length for hairpin detection |
 | `--min-hp-run N` | 4 | Minimum run length to call a homopolymer |
+| `--min-repeat-count N` | 3 | Minimum consecutive copies of a 2–4 bp motif to call a tandem repeat |
 | `--min-overlap N` | 10 | Minimum overlap to call two oligos cross-complementary |
 
 #### Output options
@@ -78,6 +79,7 @@ Spacers are added at the outer ends of every generated oligo.  For each end you 
 | `--fasta FILE` | Write sequences to a FASTA file |
 | `--json FILE` | Write full analysis results to a JSON file |
 | `--tsv FILE` | Write analysis results to a tab-separated file |
+| `--remove-tandem-repeats` | Remove oligos that meet the tandem-repeat threshold |
 | `--quiet`, `-q` | Suppress the summary table printed to stdout |
 
 #### Examples
@@ -135,6 +137,21 @@ Spacers are added at the outer ends of every generated oligo.  For each end you 
 | `--five-prime-random-length N` | Generate a random ACGT sequence of length N as the 5' flank |
 | `--three-prime-random-length N` | Generate a random ACGT sequence of length N as the 3' flank |
 
+#### Analysis options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--min-stem N` | 4 | Minimum stem length for hairpin detection |
+| `--min-loop N` | 3 | Minimum loop length for hairpin detection |
+| `--max-loop N` | 8 | Maximum loop length for hairpin detection |
+| `--min-hp-run N` | 4 | Minimum run length to call a homopolymer |
+| `--min-repeat-count N` | 3 | Minimum consecutive copies of a 2–4 bp motif within an individual arm to call a tandem repeat |
+| `--min-overlap N` | 10 | Minimum overlap to call two oligos cross-complementary |
+
+For structured oligos, tandem repeats are checked independently in each outer
+and inner arm. Spacers, added flanks, and boundaries between components are not
+included in this check.
+
 #### Output options
 
 | Option | Description |
@@ -142,6 +159,7 @@ Spacers are added at the outer ends of every generated oligo.  For each end you 
 | `--fasta FILE` | Write sequences to a FASTA file |
 | `--json FILE` | Write full analysis results to a JSON file |
 | `--tsv FILE` | Write analysis results to a tab-separated file |
+| `--remove-tandem-repeats` | Remove oligos with a tandem repeat in any arm |
 | `--quiet`, `-q` | Suppress the summary table printed to stdout |
 
 #### Oligo types

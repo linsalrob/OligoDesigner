@@ -130,6 +130,9 @@ class StructuredOligo:
     min_hp_run:
         Minimum homopolymer run length used for homopolymer detection
         (default: 4).
+    min_repeat_count:
+        Minimum consecutive copies of a 2–4 bp motif required to flag a
+        tandem repeat within an individual arm (default: 3).
     """
 
     sequence: str
@@ -145,6 +148,7 @@ class StructuredOligo:
     min_loop: int = 3
     max_loop: int = 8
     min_hp_run: int = 4
+    min_repeat_count: int = 3
 
     # ------------------------------------------------------------------
     # Computed properties
@@ -244,13 +248,19 @@ class StructuredOligo:
 
     @property
     def has_tandem_repeat(self) -> bool:
-        """``True`` if the ACGT-only portion contains a tandem repeat."""
+        """``True`` if any individual outer or inner arm has a tandem repeat.
+
+        Arms are checked separately so a repeat cannot be created artificially
+        across an arm/spacer boundary.  Added 5′ and 3′ flanks are also excluded.
+        """
         from .oligo import has_tandem_repeat as _htr
 
-        acgt_only = "".join(b for b in self.sequence if b in _ALL_BASES)
-        if not acgt_only:
-            return False
-        return _htr(DNA(acgt_only))
+        arms = (self.left_arm, self.right_arm, self.inner_left, self.inner_right)
+        return any(
+            _htr(DNA(arm), min_count=self.min_repeat_count)
+            for arm in arms
+            if arm
+        )
 
     @property
     def has_homopolymer(self) -> bool:
@@ -306,6 +316,7 @@ class StructuredOligo:
             "min_loop": self.min_loop,
             "max_loop": self.max_loop,
             "min_hp_run": self.min_hp_run,
+            "min_repeat_count": self.min_repeat_count,
         }
 
     def to_tsv_row(self) -> list[str]:

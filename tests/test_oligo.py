@@ -489,6 +489,24 @@ class TestCLI:
     def test_deduplicate_flag_exits_zero(self) -> None:
         assert main(["--count", "5", "--length", "20", "--quiet", "--seed", "1", "--deduplicate"]) == 0
 
+    def test_invalid_min_repeat_count_exits_nonzero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["--min-repeat-count", "1"])
+        assert exc.value.code != 0
+
+    def test_remove_tandem_repeats(self, tmp_path, monkeypatch) -> None:
+        import OligoDesigner.cli as cli_module
+
+        sequences = iter([DNA("ATATAT"), DNA("ACGTCA")])
+        monkeypatch.setattr(cli_module, "random_oligo", lambda length, rng: next(sequences))
+        path = str(tmp_path / "out.json")
+        main([
+            "--count", "2", "--length", "6", "--min-repeat-count", "3",
+            "--remove-tandem-repeats", "--json", path, "--quiet",
+        ])
+        data = json.loads(open(path).read())
+        assert [item["sequence"] for item in data] == ["ACGTCA"]
+
 # ---------------------------------------------------------------------------
 # CLI flank / spacer options
 # ---------------------------------------------------------------------------
@@ -841,6 +859,16 @@ class TestCLIFlanks:
         write_json(oligos, path)
         result = read_json(path)
         assert result[0].sequence == oligos[0].sequence
+
+    def test_structured_repeat_threshold_preserved(self, tmp_path) -> None:
+        from OligoDesigner.structured import generate_palindromic_motif
+
+        oligo = generate_palindromic_motif(rng=random.Random(0))
+        oligo.min_repeat_count = 5
+        path = str(tmp_path / "s.json")
+        write_json([oligo], path)
+        result = read_json(path)
+        assert result[0].min_repeat_count == 5
 
     def test_structured_oligo_type_preserved(self, tmp_path) -> None:
         from OligoDesigner.structured import generate_inverted_repeat

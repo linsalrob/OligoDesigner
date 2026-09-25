@@ -54,11 +54,12 @@ const hasHairpin = (sequence, minStem, minLoop, maxLoop) => {
   return false;
 };
 
-const hasTandemRepeat = sequence => {
+export const hasTandemRepeat = (sequence, minCount = 3) => {
+  if (!Number.isInteger(minCount) || minCount < 2) throw new Error("Minimum tandem copies must be at least 2.");
   for (let size = 2; size <= 4; size++) {
-    for (let i = 0; i <= sequence.length - size * 3; i++) {
+    for (let i = 0; i <= sequence.length - size * minCount; i++) {
       const unit = sequence.slice(i, i + size);
-      if (sequence.slice(i, i + size * 3) === unit.repeat(3)) return true;
+      if (sequence.slice(i, i + size * minCount) === unit.repeat(minCount)) return true;
     }
   }
   return false;
@@ -89,13 +90,14 @@ export function meltingTemperature(sequence) {
 
 function analyse(sequence, name, options) {
   const clean = sequence.replace(/N/g, "");
+  const minRepeatCount = options.minRepeatCount ?? 3;
   const composition = Object.fromEntries([...BASES].map(base => [base, [...sequence].filter(v => v === base).length]));
   const longest = longestHomopolymer(clean);
   return { name, sequence, length: sequence.length, gc_content: clean.length ? (composition.G + composition.C) / clean.length : 0,
     entropy: entropy(clean), tm: meltingTemperature(clean), base_composition: composition, longest_homopolymer: longest,
     has_homopolymer: longest >= options.minHpRun, is_low_complexity: isLowComplexity(clean),
     is_palindrome: sequence === reverseComplement(sequence), has_hairpin: hasHairpin(sequence, options.minStem, options.minLoop, options.maxLoop),
-    has_tandem_repeat: hasTandemRepeat(clean), complementary_to: [] };
+    has_tandem_repeat: hasTandemRepeat(clean, minRepeatCount), complementary_to: [] };
 }
 
 function addComplementarity(entries, minOverlap) {
@@ -126,6 +128,8 @@ function flankGenerator(fixed, length, same, count, random) {
 
 function validate(options, structured = false) {
   for (const [label, value] of [["count", options.count], ["minimum stem", options.minStem], ["minimum loop", options.minLoop], ["homopolymer run", options.minHpRun], ["minimum overlap", options.minOverlap]]) if (!Number.isInteger(value) || value < 1) throw new Error(`${label} must be at least 1.`);
+  const minRepeatCount = options.minRepeatCount ?? 3;
+  if (!Number.isInteger(minRepeatCount) || minRepeatCount < 2) throw new Error("Minimum tandem copies must be at least 2.");
   if (options.maxLoop < options.minLoop) throw new Error("Maximum loop must be at least minimum loop.");
   for (const [label, fixed, length] of [["5′",options.fivePrime,options.fiveRandomLength],["3′",options.threePrime,options.threeRandomLength]]) {
     if (fixed && length) throw new Error(`${label} fixed and random flanks are mutually exclusive.`);
@@ -141,11 +145,13 @@ export function generateOligos(options) {
   const width = String(options.count).length;
   let entries = Array.from({length: options.count}, (_, i) => analyse(five() + randomSequence(options.length, random) + three(), `${options.prefix}${String(i + 1).padStart(width,"0")}`, options));
   if (options.deduplicate || options.sameRandom) entries = deduplicate(entries);
+  if (options.removeTandemRepeats) entries = entries.filter(item => !item.has_tandem_repeat);
   addComplementarity(entries, options.minOverlap); return entries;
 }
 
 export function generateStructuredOligos(options) {
   validate(options, true);
+  const minRepeatCount = options.minRepeatCount ?? 3;
   for (const [label,value] of [["Half length",options.halfLength],["Outer arm length",options.outerArmLength],["Inner half length",options.innerHalfLength]]) if (value < 1) throw new Error(`${label} must be at least 1.`);
   const random = seededRandom(options.seed), types = options.type === "all" ? ["palindrome","inverted_repeat","at_rich"] : [options.type], total = options.count * types.length;
   const five = flankGenerator(options.fivePrime, options.fiveRandomLength, options.sameRandom, total, random), three = flankGenerator(options.threePrime, options.threeRandomLength, options.sameRandom, total, random), width = String(total).length;
@@ -155,9 +161,10 @@ export function generateStructuredOligos(options) {
     if (type === "inverted_repeat") { left = randomSequence(options.outerArmLength, random); right = reverseComplement(left); innerLeft = randomSequence(options.innerHalfLength, random); innerRight = reverseComplement(innerLeft); spacer = randomSequence(options.spacerLength, random); sequence = left + innerLeft + spacer + innerRight + right; oligoType = type; }
     else { left = randomSequence(options.halfLength, random, type === "at_rich" ? "AT" : BASES); right = reverseComplement(left); spacer = type === "at_rich" ? "N".repeat(options.spacerLength) : randomSequence(options.spacerLength, random); sequence = left + spacer + right; oligoType = type === "at_rich" ? "at_rich_palindrome" : "palindromic_motif"; }
     sequence = five() + sequence + three(); const item = analyse(sequence, `${options.prefix}${String(++index).padStart(width,"0")}`, options);
-    Object.assign(item, {oligo_type:oligoType,left_arm:left,right_arm:right,spacer,inner_left:innerLeft,inner_right:innerRight,is_palindrome:right===reverseComplement(left),inner_is_palindrome:innerLeft ? innerRight===reverseComplement(innerLeft) : false,min_stem:options.minStem,min_loop:options.minLoop,max_loop:options.maxLoop,min_hp_run:options.minHpRun}); entries.push(item);
+    Object.assign(item, {oligo_type:oligoType,left_arm:left,right_arm:right,spacer,inner_left:innerLeft,inner_right:innerRight,is_palindrome:right===reverseComplement(left),inner_is_palindrome:innerLeft ? innerRight===reverseComplement(innerLeft) : false,min_stem:options.minStem,min_loop:options.minLoop,max_loop:options.maxLoop,min_hp_run:options.minHpRun,min_repeat_count:minRepeatCount,has_tandem_repeat:[left,right,innerLeft,innerRight].filter(Boolean).some(arm=>hasTandemRepeat(arm,minRepeatCount))}); entries.push(item);
   }
   if (options.deduplicate || options.sameRandom) entries = deduplicate(entries);
+  if (options.removeTandemRepeats) entries = entries.filter(item => !item.has_tandem_repeat);
   addComplementarity(entries, options.minOverlap); return entries;
 }
 

@@ -488,6 +488,7 @@ def _record_to_oligo(record: dict):
                 min_loop=record.get("min_loop", 3),
                 max_loop=record.get("max_loop", 8),
                 min_hp_run=record.get("min_hp_run", 4),
+                min_repeat_count=record.get("min_repeat_count", 3),
             )
         except KeyError as exc:
             raise ValueError(
