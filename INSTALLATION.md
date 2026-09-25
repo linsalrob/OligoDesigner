@@ -15,9 +15,10 @@ cd OligoDesigner
 pip install .
 ```
 
-This installs the `OligoDesigner` package and registers two command-line tools:
+This installs the `OligoDesigner` package and registers three command-line tools:
 - `generate-oligos`
 - `generate-structured-oligos`
+- `generate-sequence-logo`
 
 ## Optional: Visualisation dependencies
 
@@ -53,13 +54,17 @@ After installation, confirm that the command-line tools are available:
 ```bash
 generate-oligos --help
 generate-structured-oligos --help
+generate-sequence-logo --help
 ```
 
-To run the test suite:
+To run the test suite (visualization tests are skipped if the optional `viz`
+dependencies are not installed):
 
 ```bash
 pytest
 ```
+
+Install `.[dev,viz]` before running `pytest` to include the PNG-rendering tests.
 
 ## Virtual Environment (recommended)
 

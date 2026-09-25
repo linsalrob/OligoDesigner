@@ -1,14 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { generateOligos, generateStructuredOligos, logoMatrix, logoStackBases, meltingTemperature, parseSequenceFile, reverseComplement, toFasta, toJson, toTsv } from "../web/core.js";
+import { generateOligos, generateStructuredOligos, hasTandemRepeat, logoMatrix, logoStackBases, meltingTemperature, parseSequenceFile, reverseComplement, toFasta, toJson, toTsv } from "../web/core.js";
 
-const defaults={count:3,length:12,seed:42,prefix:"oligo",fivePrime:"",threePrime:"",fiveRandomLength:null,threeRandomLength:null,sameRandom:false,deduplicate:false,minStem:4,minLoop:3,maxLoop:8,minHpRun:4,minOverlap:10};
+const defaults={count:3,length:12,seed:42,prefix:"oligo",fivePrime:"",threePrime:"",fiveRandomLength:null,threeRandomLength:null,sameRandom:false,deduplicate:false,removeTandemRepeats:false,minStem:4,minLoop:3,maxLoop:8,minHpRun:4,minRepeatCount:3,minOverlap:10};
 const structured={...defaults,count:2,prefix:"soligo",type:"all",halfLength:6,outerArmLength:8,innerHalfLength:6,spacerLength:2};
 
 test("reverse complement and Tm match core DNA semantics",()=>{assert.equal(reverseComplement("GAATTC"),"GAATTC");assert.equal(reverseComplement("AACG"),"CGTT");assert.ok(Number.isFinite(meltingTemperature("GCATGCATGCAT")));});
 test("random generation is reproducible and analysed",()=>{const a=generateOligos(defaults),b=generateOligos(defaults);assert.deepEqual(a,b);assert.equal(a.length,3);assert.equal(a[0].sequence.length,12);assert.match(a[0].sequence,/^[ACGT]+$/);assert.equal(typeof a[0].has_hairpin,"boolean");});
 test("fixed and random flanks are supported",()=>{const fixed=generateOligos({...defaults,fivePrime:"AAA",threePrime:"TT"});assert.ok(fixed.every(item=>item.sequence.startsWith("AAA")&&item.sequence.endsWith("TT")));const random=generateOligos({...defaults,fiveRandomLength:3});assert.equal(new Set(random.map(item=>item.sequence.slice(0,3))).size,3);});
 test("invalid mutually exclusive flank options are rejected",()=>assert.throws(()=>generateOligos({...defaults,fivePrime:"AAA",fiveRandomLength:3}),/mutually exclusive/));
+test("tandem repeat copy threshold is configurable",()=>{assert.equal(hasTandemRepeat("ATATAT",3),true);assert.equal(hasTandemRepeat("ATATAT",4),false);});
+test("tandem repeat copy threshold must be at least two",()=>assert.throws(()=>hasTandemRepeat("ATAT",1),/at least 2/));
+test("tandem repeat filter removes flagged random oligos",()=>{const entries=generateOligos({...defaults,count:100,length:8,minRepeatCount:2,removeTandemRepeats:true});assert.ok(entries.length<100);assert.ok(entries.every(item=>!item.has_tandem_repeat));});
+test("structured tandem repeats are checked within individual arms",()=>{const entries=generateStructuredOligos({...structured,count:20,type:"inverted_repeat",minRepeatCount:2});assert.ok(entries.some(item=>item.has_tandem_repeat));assert.ok(entries.every(item=>item.has_tandem_repeat===[item.left_arm,item.right_arm,item.inner_left,item.inner_right].some(arm=>hasTandemRepeat(arm,2))));});
+test("deduplication keeps the first occurrence of each exact sequence",()=>{const options={...defaults,count:20,length:1};const all=generateOligos(options);const expected=all.filter((item,i,entries)=>entries.findIndex(other=>other.sequence===item.sequence)===i);const unique=generateOligos({...options,deduplicate:true});assert.ok(expected.length<all.length);assert.deepEqual(unique.map(({name,sequence})=>({name,sequence})),expected.map(({name,sequence})=>({name,sequence})));});
 test("structured all creates every structure type",()=>{const items=generateStructuredOligos(structured);assert.equal(items.length,6);assert.deepEqual(new Set(items.map(item=>item.oligo_type)),new Set(["palindromic_motif","inverted_repeat","at_rich_palindrome"]));assert.ok(items.every(item=>item.is_palindrome));});
 test("structured spacer validates supported values",()=>assert.throws(()=>generateStructuredOligos({...structured,spacerLength:1}),/Spacer length/));
 test("all download serializations include every entry",()=>{const entries=generateOligos(defaults);assert.equal((toFasta(entries).match(/^>/gm)||[]).length,3);assert.equal(JSON.parse(toJson(entries)).length,3);assert.equal(toTsv(entries).trim().split("\n").length,4);});

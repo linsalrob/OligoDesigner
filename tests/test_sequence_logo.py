@@ -25,23 +25,30 @@ def _make_oligos(*seqs: str) -> list[SimpleNamespace]:
     return [SimpleNamespace(sequence=s) for s in seqs]
 
 
+@pytest.fixture
+def require_viz() -> None:
+    """Skip rendering tests when the optional visualization stack is absent."""
+    pytest.importorskip("logomaker")
+    pytest.importorskip("matplotlib.pyplot")
+
+
 # ---------------------------------------------------------------------------
 # _build_count_matrix
 # ---------------------------------------------------------------------------
 
-def test_build_count_matrix_basic():
+def test_build_count_matrix_basic(require_viz):
     df = _build_count_matrix(["ACGT"])
     assert list(df.columns) == ["A", "C", "G", "T"]
     assert list(df["A"]) == [1, 0, 0, 0]
     assert list(df["T"]) == [0, 0, 0, 1]
 
 
-def test_build_count_matrix_empty_raises():
+def test_build_count_matrix_empty_raises(require_viz):
     with pytest.raises(ValueError, match="empty"):
         _build_count_matrix([])
 
 
-def test_build_count_matrix_truncates():
+def test_build_count_matrix_truncates(require_viz):
     df = _build_count_matrix(["ACGT", "AC"])
     assert len(df) == 2  # truncated to shortest
 
@@ -77,7 +84,7 @@ def test_empty_source_raises():
 # sequence_logo – stack_order="value" (default)
 # ---------------------------------------------------------------------------
 
-def test_stack_order_value_produces_png():
+def test_stack_order_value_produces_png(require_viz):
     oligos = _make_oligos("ACGT", "ACGT", "ACGT")
     with tempfile.TemporaryDirectory() as d:
         out = os.path.join(d, "logo.png")
@@ -90,7 +97,7 @@ def test_stack_order_value_produces_png():
 # sequence_logo – stack_order="alphabetical"
 # ---------------------------------------------------------------------------
 
-def test_stack_order_alphabetical_produces_png():
+def test_stack_order_alphabetical_produces_png(require_viz):
     oligos = _make_oligos("ACGT", "ACGT", "ACGT")
     with tempfile.TemporaryDirectory() as d:
         out = os.path.join(d, "logo.png")
@@ -131,7 +138,7 @@ def test_cli_parser_stack_order_choices():
         parser.parse_args(["in.json", "out.png", "--stack-order", "invalid"])
 
 
-def test_cli_stack_order_value(tmp_path):
+def test_cli_stack_order_value(tmp_path, require_viz):
     from OligoDesigner.oligo import analyse_oligo, write_json
     from OligoDesigner.dna import DNA
 
@@ -146,7 +153,7 @@ def test_cli_stack_order_value(tmp_path):
     assert os.path.exists(out_path)
 
 
-def test_cli_stack_order_alphabetical(tmp_path):
+def test_cli_stack_order_alphabetical(tmp_path, require_viz):
     from OligoDesigner.oligo import analyse_oligo, write_json
     from OligoDesigner.dna import DNA
 

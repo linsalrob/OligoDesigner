@@ -236,6 +236,10 @@ class TestStructuredOligoSerialization:
         d = generate_palindromic_motif(half_length=10, rng=random.Random(1)).to_dict()
         assert isinstance(d["tm"], float)
 
+    def test_to_dict_includes_repeat_threshold(self) -> None:
+        d = generate_palindromic_motif(rng=random.Random(1)).to_dict()
+        assert d["min_repeat_count"] == 3
+
     def test_tm_realistic_range_for_20bp(self) -> None:
         oligo = generate_palindromic_motif(half_length=10, rng=random.Random(1))
         assert 10.0 < oligo.tm < 85.0
@@ -593,6 +597,48 @@ class TestAnalysisParameterFields:
         oligo = generate_palindromic_motif(rng=random.Random(1))
         assert oligo.min_hp_run == 4
 
+    def test_default_min_repeat_count_is_3(self) -> None:
+        oligo = generate_palindromic_motif(rng=random.Random(1))
+        assert oligo.min_repeat_count == 3
+
+    def test_tandem_repeat_threshold_is_configurable(self) -> None:
+        oligo = StructuredOligo(
+            sequence="ATATATCGCGCG",
+            oligo_type="palindromic_motif",
+            left_arm="ATATAT",
+            right_arm="CGCGCG",
+            spacer="",
+            inner_left="",
+            inner_right="",
+        )
+        assert oligo.has_tandem_repeat is True
+        oligo.min_repeat_count = 4
+        assert oligo.has_tandem_repeat is False
+
+    def test_tandem_repeat_does_not_cross_arm_boundary(self) -> None:
+        oligo = StructuredOligo(
+            sequence="CATATAT",
+            oligo_type="palindromic_motif",
+            left_arm="CAT",
+            right_arm="ATAT",
+            spacer="",
+            inner_left="",
+            inner_right="",
+        )
+        assert oligo.has_tandem_repeat is False
+
+    def test_tandem_repeat_checks_inner_arms(self) -> None:
+        oligo = StructuredOligo(
+            sequence="ACGTATATATCGTA",
+            oligo_type="inverted_repeat",
+            left_arm="ACGT",
+            right_arm="ACGT",
+            spacer="",
+            inner_left="ATATAT",
+            inner_right="",
+        )
+        assert oligo.has_tandem_repeat is True
+
     def test_high_min_stem_disables_hairpin(self) -> None:
         oligo = self._make_hairpin_oligo()
         assert oligo.has_hairpin is True  # default min_stem=4
@@ -666,6 +712,40 @@ class TestStructuredCLIAnalysisOptions:
 
     def test_min_overlap_option_accepted(self) -> None:
         assert main(["--min-overlap", "8", "--quiet", "--seed", "1"]) == 0
+
+    def test_min_repeat_count_option_accepted(self) -> None:
+        assert main(["--min-repeat-count", "4", "--quiet", "--seed", "1"]) == 0
+
+    def test_invalid_min_repeat_count_exits_nonzero(self) -> None:
+        with pytest.raises(SystemExit) as exc:
+            main(["--min-repeat-count", "1"])
+        assert exc.value.code != 0
+
+    def test_remove_tandem_repeats_in_arms(self, tmp_path, monkeypatch) -> None:
+        import OligoDesigner.structured_cli as cli_module
+
+        def fake_batch(oligo_type, count, args, rng, start_index, width):
+            return [
+                StructuredOligo(
+                    sequence="ATATATCGCGCG", oligo_type="palindromic_motif",
+                    left_arm="ATATAT", right_arm="CGCGCG", spacer="",
+                    inner_left="", inner_right="", name="repeat",
+                ),
+                StructuredOligo(
+                    sequence="ACGTCAGTACGT", oligo_type="palindromic_motif",
+                    left_arm="ACGTCA", right_arm="GTACGT", spacer="",
+                    inner_left="", inner_right="", name="safe",
+                ),
+            ]
+
+        monkeypatch.setattr(cli_module, "_generate_batch", fake_batch)
+        path = str(tmp_path / "out.json")
+        main([
+            "--type", "palindrome", "--count", "2", "--min-repeat-count", "3",
+            "--remove-tandem-repeats", "--json", path, "--quiet",
+        ])
+        data = json.loads(open(path).read())
+        assert [item["name"] for item in data] == ["safe"]
 
     def test_high_min_stem_reduces_hairpins(self, tmp_path) -> None:
         path_default = str(tmp_path / "default.json")

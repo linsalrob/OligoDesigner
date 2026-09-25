@@ -7,6 +7,7 @@ Usage
     generate-oligos [--count N] [--length L] [--seed S]
                     [--five-prime-spacer SEQ] [--three-prime-spacer SEQ]
                     [--five-prime-random-length N] [--three-prime-random-length N]
+                    [--min-repeat-count N] [--remove-tandem-repeats]
                     [--fasta FILE] [--json FILE] [--tsv FILE]
 
 Run ``generate-oligos --help`` for the full option list.
@@ -23,6 +24,7 @@ from .oligo import (
     OligoAnalysis,
     analyse_oligo,
     find_complementary_pairs,
+    has_tandem_repeat,
     random_oligo,
     remove_duplicate_sequences,
     write_fasta,
@@ -163,6 +165,16 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Minimum overlap for cross-complementarity detection (default: 10).",
     )
+    ana.add_argument(
+        "--min-repeat-count",
+        type=int,
+        default=3,
+        metavar="N",
+        help=(
+            "Minimum consecutive copies of a 2–4 bp motif required to flag "
+            "a tandem repeat (default: 3)."
+        ),
+    )
 
     # Output options
     out = parser.add_argument_group("output")
@@ -197,6 +209,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "Remove oligos with duplicate sequences before output, "
             "keeping only the first occurrence of each unique sequence."
         ),
+    )
+    out.add_argument(
+        "--remove-tandem-repeats",
+        action="store_true",
+        help="Remove oligos flagged by the tandem-repeat threshold before output.",
     )
 
     return parser
@@ -321,6 +338,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--count must be >= 1")
     if args.length < 1:
         parser.error("--length must be >= 1")
+    if args.min_repeat_count < 2:
+        parser.error("--min-repeat-count must be >= 2")
 
     # Flank validation
     if args.five_prime_spacer is not None and args.five_prime_random_length is not None:
@@ -390,6 +409,23 @@ def main(argv: list[str] | None = None) -> int:
                 + ", ".join(removed)
             )
 
+    if args.remove_tandem_repeats:
+        kept_oligos: list[DNA] = []
+        kept_names: list[str] = []
+        removed_repeats: list[str] = []
+        for oligo, name in zip(oligos, names):
+            if has_tandem_repeat(oligo, min_count=args.min_repeat_count):
+                removed_repeats.append(name)
+            else:
+                kept_oligos.append(oligo)
+                kept_names.append(name)
+        oligos, names = kept_oligos, kept_names
+        if removed_repeats and not args.quiet:
+            print(
+                f"Removed {len(removed_repeats)} oligo(s) with tandem repeats: "
+                + ", ".join(removed_repeats)
+            )
+
     # Per-oligo analysis (without cross-complementarity)
     analyses: list[OligoAnalysis] = [
         analyse_oligo(
@@ -399,6 +435,7 @@ def main(argv: list[str] | None = None) -> int:
             min_loop=args.min_loop,
             max_loop=args.max_loop,
             min_hp_run=args.min_hp_run,
+            min_repeat_count=args.min_repeat_count,
         )
         for i in range(len(oligos))
     ]
