@@ -202,6 +202,7 @@ generate-sequence-logo INPUT OUTPUT [options]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--logo-type TYPE` | `counts` | Logo style: `counts` (raw nucleotide counts), `probability` (fraction of each base), or `information` (information-content bits) |
+| `--stack-order ORDER` | `value` | Base stacking: `value` puts the largest value at the bottom; `alphabetical` keeps a consistent A-to-T order from top to bottom |
 | `--title TEXT` | *(none)* | Title to display above the logo |
 | `--color-scheme SCHEME` | `classic` | [logomaker](https://logomaker.readthedocs.io) colour scheme (e.g. `classic`, `base_pairing`, `NajafabadiEtAl2017`) |
 

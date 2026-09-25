@@ -152,15 +152,6 @@ def sequence_logo(
     ...     os.path.exists(png_path)
     True
     """
-    try:
-        import logomaker
-        import matplotlib.pyplot as plt
-    except ImportError as exc:
-        raise ImportError(
-            "sequence_logo requires the 'logomaker' and 'matplotlib' packages. "
-            "Install them with: pip install logomaker matplotlib"
-        ) from exc
-
     _VALID_TYPES = _VALID_LOGO_TYPES
     if logo_type not in _VALID_TYPES:
         raise ValueError(
@@ -192,6 +183,15 @@ def sequence_logo(
                 "objects, or a path to a JSON file written by write_json()."
             )
         sequences.append(obj.sequence.upper())
+
+    try:
+        import logomaker
+        import matplotlib.pyplot as plt
+    except ImportError as exc:
+        raise ImportError(
+            "sequence_logo requires the 'logomaker' and 'matplotlib' packages. "
+            "Install them with: pip install logomaker matplotlib"
+        ) from exc
 
     # ---- Build count matrix --------------------------------------------
     count_df = _build_count_matrix(sequences)

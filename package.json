@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "npm run test:web",
     "test:web": "node --test tests/web.test.js"
   }
 }
